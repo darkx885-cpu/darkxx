@@ -17,16 +17,16 @@ API_URL = "https://yoyomedia.com/api/v2"
 SERVICE_VIEWS = 4480
 SERVICE_LIKES = 4731
 
-# 6:50 PM (18:50 IST) se shuru hone wala Exact Schedule
+# 8:30 PM (20:30 IST) se shuru hone wala Exact Schedule
 SCHEDULE = [
-    {"time": "18:50", "views": 117, "likes": 0},   # 1st hour (6:50 PM)
-    {"time": "19:50", "views": 348, "likes": 0},   # 2nd hour (7:50 PM)
-    {"time": "20:50", "views": 765, "likes": 0},   # 3rd hour (8:50 PM)
-    {"time": "21:50", "views": 1630, "likes": 10}, # 4th hour (9:50 PM)
-    {"time": "22:50", "views": 2404, "likes": 12}, # 5th hour (10:50 PM)
-    {"time": "23:50", "views": 2736, "likes": 15}, # 6th hour (11:50 PM)
-    {"time": "00:50", "views": 2896, "likes": 16}, # 7th hour (12:50 AM - Next day)
-    {"time": "01:50", "views": 3003, "likes": 17}, # 8th hour (1:50 AM - Next day)
+    {"time": "20:30", "views": 117, "likes": 0},   # 1st hour (8:30 PM)
+    {"time": "21:30", "views": 348, "likes": 0},   # 2nd hour (9:30 PM)
+    {"time": "22:30", "views": 765, "likes": 0},   # 3rd hour (10:30 PM)
+    {"time": "23:30", "views": 1630, "likes": 10}, # 4th hour (11:30 PM)
+    {"time": "00:30", "views": 2404, "likes": 12}, # 5th hour (12:30 AM next day)
+    {"time": "01:30", "views": 2736, "likes": 15}, # 6th hour (1:30 AM next day)
+    {"time": "02:30", "views": 2896, "likes": 16}, # 7th hour (2:30 AM next day)
+    {"time": "03:30", "views": 3003, "likes": 17}, # 8th hour (3:30 AM next day)
 ]
 
 def place_order(service_id, link, quantity):
@@ -46,7 +46,7 @@ def get_ist_now():
     return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
 def run_campaign(chat_id, link):
-    bot.send_message(chat_id, "🚀 *Campaign Started!*\nBot 6:50 PM (18:50 IST) se orders lagana shuru karega.", parse_mode="Markdown")
+    bot.send_message(chat_id, "🚀 *Campaign Started!*\nBot 8:30 PM (20:30 IST) se orders lagana shuru karega.", parse_mode="Markdown")
     
     for step in SCHEDULE:
         target_time_str = step["time"]
@@ -57,7 +57,22 @@ def run_campaign(chat_id, link):
             now = get_ist_now()
             current_time_str = now.strftime("%H:%M")
             
-            if current_time_str >= target_time_str:
+            # Accurate comparison handling overnight crossover
+            target_h, target_m = map(int, target_time_str.split(":"))
+            curr_h, curr_m = map(int, current_time_str.split(":"))
+            
+            # Check if target time reached
+            time_reached = False
+            if target_h >= 20: # Steps before midnight (20:30, 21:30, 22:30, 23:30)
+                if curr_h >= target_h and curr_m >= target_m:
+                    time_reached = True
+                elif curr_h < 12: # If clock rolled over to early morning (00:xx, 01:xx)
+                    time_reached = True
+            else: # Steps after midnight (00:30, 01:30, 02:30, 03:30)
+                if curr_h < 12 and (curr_h > target_h or (curr_h == target_h and curr_m >= target_m)):
+                    time_reached = True
+            
+            if time_reached:
                 msg = f"⏰ *Time Slot: {target_time_str} (IST)*\n"
                 
                 if v_qty > 0:
