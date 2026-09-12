@@ -7,10 +7,10 @@ from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Naya Bot Token
-BOT_TOKEN = "8901542723:AAFd54ZpaMc9DyOdqEKp6KFsEXlFMzgygYU"
+BOT_TOKEN = "7880836150:AAE_g3LC9ZY3Vy9wwhgL7znE0ei4lvfstXk"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-API_KEY = "7880836150:AAE_g3LC9ZY3Vy9wwhgL7znE0ei4lvfstXk"
+API_KEY = "e162df9b7dce5201f22c0decd4d4dff931c9904c708e1342b9da9b086e32b1ac"
 API_URL = "https://yoyomedia.com/api/v2"
 
 SERVICE_VIEWS = 4480
