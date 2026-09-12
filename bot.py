@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 
 # Bot Token & Config (@Darkzzzo_bot)
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8959503657:AAHqIMDcxE1XFcQe_4MfJ4vgoQikFkscAf4")
+BOT_TOKEN = "8959503657:AAHqlMDcxEIXFcQe_4MfJ4vgoQikFkscAf4"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 API_KEY = "e162df9b7dce5201f22c0decd4d4dff931c9904c708e1342b9da9b086e32b1ac"
