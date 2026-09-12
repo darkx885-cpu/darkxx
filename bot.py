@@ -7,8 +7,8 @@ import socketserver
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 
-# Bot Token & Config
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "7880836150:AAE_g3LC9ZY3Vy9wwhgL7znE0ei4lvfstXk")
+# Bot Token & Config (@Darkzzzo_bot)
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8959503657:AAHqlMDcxEIXFcQe_4MfJ4vgoQikFkscAf4")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 API_KEY = "e162df9b7dce5201f22c0decd4d4dff931c9904c708e1342b9da9b086e32b1ac"
@@ -272,3 +272,4 @@ while True:
     except Exception as e:
         print(f"Connection lost: {e}. Reconnecting in 5 seconds...")
         time.sleep(5)
+        
