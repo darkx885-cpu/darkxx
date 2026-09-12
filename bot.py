@@ -17,17 +17,29 @@ API_URL = "https://yoyomedia.com/api/v2"
 SERVICE_VIEWS = 4480
 SERVICE_LIKES = 4731
 
-# 8:30 PM (20:30 IST) se shuru hone wala Exact Schedule
-SCHEDULE = [
-    {"time": "20:30", "views": 117, "likes": 0},   # 1st hour (8:30 PM)
-    {"time": "21:30", "views": 348, "likes": 0},   # 2nd hour (9:30 PM)
-    {"time": "22:30", "views": 765, "likes": 0},   # 3rd hour (10:30 PM)
-    {"time": "23:30", "views": 1630, "likes": 10}, # 4th hour (11:30 PM)
-    {"time": "00:30", "views": 2404, "likes": 12}, # 5th hour (12:30 AM next day)
-    {"time": "01:30", "views": 2736, "likes": 15}, # 6th hour (1:30 AM next day)
-    {"time": "02:30", "views": 2896, "likes": 16}, # 7th hour (2:30 AM next day)
-    {"time": "03:30", "views": 3003, "likes": 17}, # 8th hour (3:30 AM next day)
+ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
+
+campaign_running = False
+stop_campaign_flag = False
+current_campaign_info = {}
+
+# Views & Likes Quantities for 8 Steps
+STEPS_DATA = [
+    {"views": 117, "likes": 0},   # Step 1
+    {"views": 348, "likes": 0},   # Step 2
+    {"views": 765, "likes": 0},   # Step 3
+    {"views": 1630, "likes": 10}, # Step 4
+    {"views": 2404, "likes": 12}, # Step 5
+    {"views": 2736, "likes": 15}, # Step 6
+    {"views": 2896, "likes": 16}, # Step 7
+    {"views": 3003, "likes": 17}, # Step 8
 ]
+
+def check_admin(message):
+    global ADMIN_ID
+    if ADMIN_ID == 0:
+        ADMIN_ID = message.chat.id
+    return message.chat.id == ADMIN_ID
 
 def place_order(service_id, link, quantity):
     if quantity <= 0:
@@ -42,38 +54,88 @@ def place_order(service_id, link, quantity):
     except Exception as e:
         return {"error": str(e)}
 
+def get_balance():
+    payload = {"key": API_KEY, "action": "balance"}
+    try:
+        res = requests.post(API_URL, data=payload)
+        data = res.json()
+        if "balance" in data:
+            usd_bal = float(data['balance'])
+            usd_to_inr_rate = 83.50  # 1 USD = ~83.50 INR
+            inr_bal = usd_bal * usd_to_inr_rate
+            
+            return (
+                f"💵 **Panel Balance:**\n"
+                f"🇮🇳 **₹{inr_bal:.2f} INR**\n"
+                f"🇺🇸 `${usd_bal:.2f} USD`"
+            )
+        else:
+            return "❌ Unable to fetch balance."
+    except Exception as e:
+        return f"❌ Error fetching balance: {e}"
+
 def get_ist_now():
     return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
-def run_campaign(chat_id, link):
-    bot.send_message(chat_id, "🚀 *Campaign Started!*\nBot 8:30 PM (20:30 IST) se orders lagana shuru karega.", parse_mode="Markdown")
+def run_campaign(chat_id, link, start_time_str, start_step):
+    global campaign_running, stop_campaign_flag, current_campaign_info
+    campaign_running = True
+    stop_campaign_flag = False
     
-    for step in SCHEDULE:
-        target_time_str = step["time"]
+    now = get_ist_now()
+    
+    # Time Parsing
+    if start_time_str:
+        try:
+            sh, sm = map(int, start_time_str.split(":"))
+            start_dt = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
+            if start_dt < now and (now - start_dt).total_seconds() > 300:
+                start_dt = start_dt + timedelta(days=1)
+        except Exception:
+            start_dt = now
+    else:
+        start_dt = now
+
+    # Slice steps from start_step - 1 to end
+    steps_to_run = STEPS_DATA[start_step-1:]
+
+    current_campaign_info = {
+        "link": link,
+        "start_time": start_dt.strftime('%I:%M %p'),
+        "completed_steps": start_step - 1,
+        "total_steps": 8
+    }
+
+    msg_start = (
+        f"🚀 *Campaign Scheduled!*\n"
+        f"🔗 **Link:** {link}\n"
+        f"⏰ **Start Time:** `{start_dt.strftime('%I:%M %p')} IST`\n"
+        f"🔢 **Starting from Batch/Step:** `{start_step}`"
+    )
+    bot.send_message(chat_id, msg_start, parse_mode="Markdown")
+    
+    for relative_idx, step in enumerate(steps_to_run):
+        if stop_campaign_flag:
+            bot.send_message(chat_id, "🛑 **Campaign Stopped by User!**", parse_mode="Markdown")
+            break
+            
+        actual_step_num = start_step + relative_idx
+        target_dt = start_dt + timedelta(hours=relative_idx)
+        target_time_str = target_dt.strftime("%I:%M %p")
+        
+        current_campaign_info["completed_steps"] = actual_step_num - 1
+        current_campaign_info["next_step_time"] = target_time_str
+        
         v_qty = step["views"]
         l_qty = step["likes"]
         
         while True:
-            now = get_ist_now()
-            current_time_str = now.strftime("%H:%M")
-            
-            # Accurate comparison handling overnight crossover
-            target_h, target_m = map(int, target_time_str.split(":"))
-            curr_h, curr_m = map(int, current_time_str.split(":"))
-            
-            # Check if target time reached
-            time_reached = False
-            if target_h >= 20: # Steps before midnight (20:30, 21:30, 22:30, 23:30)
-                if curr_h >= target_h and curr_m >= target_m:
-                    time_reached = True
-                elif curr_h < 12: # If clock rolled over to early morning (00:xx, 01:xx)
-                    time_reached = True
-            else: # Steps after midnight (00:30, 01:30, 02:30, 03:30)
-                if curr_h < 12 and (curr_h > target_h or (curr_h == target_h and curr_m >= target_m)):
-                    time_reached = True
-            
-            if time_reached:
-                msg = f"⏰ *Time Slot: {target_time_str} (IST)*\n"
+            if stop_campaign_flag:
+                break
+                
+            current_ist = get_ist_now()
+            if current_ist >= target_dt:
+                msg = f"⏰ *Batch/Step {actual_step_num}/8 ({target_time_str} IST)*\n"
                 
                 if v_qty > 0:
                     v_res = place_order(SERVICE_VIEWS, link, v_qty)
@@ -90,27 +152,98 @@ def run_campaign(chat_id, link):
                         msg += f"❤️ Likes (+{l_qty}): ❌ Panel Error"
                         
                 bot.send_message(chat_id, msg, parse_mode="Markdown")
-                time.sleep(60) # Prevent multiple triggers in same minute
+                time.sleep(5)
                 break
             else:
-                time.sleep(15) # Efficient sleep to prevent high CPU usage
-            
-    bot.send_message(chat_id, "🎉 *Full Campaign Successfully Completed!*", parse_mode="Markdown")
+                time.sleep(15)
+                
+    campaign_running = False
+    if not stop_campaign_flag:
+        bot.send_message(chat_id, "🎉 *Full Campaign Successfully Completed!*", parse_mode="Markdown")
+
+# --- BOT COMMAND HANDLERS ---
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "👋 Welcome Bot!\nOrder lagane ke liye aise bhejein:\n\n`/run <link>`", parse_mode="Markdown")
+    if not check_admin(message):
+        bot.reply_to(message, "⛔ Access Denied! You are not authorized.")
+        return
+        
+    welcome_txt = (
+        "👋 **Welcome Boss! Campaign Bot Control Panel**\n\n"
+        "📌 **Available Commands:**\n"
+        "🔹 `/run <link> <time> <step>` - Start campaign\n"
+        "   *Example (Full Run from Step 1):* `/run https://reel_link 20:30`\n"
+        "   *Example (Start from Step 3):* `/run https://reel_link 21:40 3`\n\n"
+        "🔹 `/balance` - Check SMM Panel Balance in INR (₹)\n"
+        "🔹 `/status` - Check Running Campaign Status\n"
+        "🔹 `/stop` - Cancel/Stop Active Campaign"
+    )
+    bot.reply_to(message, welcome_txt, parse_mode="Markdown")
+
+@bot.message_handler(commands=['balance'])
+def handle_balance(message):
+    if not check_admin(message):
+        return
+    bal_msg = get_balance()
+    bot.reply_to(message, bal_msg, parse_mode="Markdown")
+
+@bot.message_handler(commands=['status'])
+def handle_status(message):
+    if not check_admin(message):
+        return
+    if campaign_running:
+        info = (
+            f"📊 **Active Campaign Status:**\n\n"
+            f"🔗 **Link:** {current_campaign_info.get('link')}\n"
+            f"📈 **Completed Steps:** {current_campaign_info.get('completed_steps')}/8\n"
+            f"⏰ **Next Step Time:** {current_campaign_info.get('next_step_time', 'Executing now')}"
+        )
+    else:
+        info = "ℹ️ No campaign is currently running."
+    bot.reply_to(message, info, parse_mode="Markdown")
+
+@bot.message_handler(commands=['stop'])
+def handle_stop(message):
+    global stop_campaign_flag
+    if not check_admin(message):
+        return
+    if campaign_running:
+        stop_campaign_flag = True
+        bot.reply_to(message, "⏳ Stopping campaign, please wait...")
+    else:
+        bot.reply_to(message, "ℹ️ No active campaign to stop.")
 
 @bot.message_handler(commands=['run'])
 def handle_run(message):
+    if not check_admin(message):
+        return
+    global campaign_running
+    if campaign_running:
+        bot.reply_to(message, "⚠️ Pehle se ek campaign chal rahi hai! Use `/stop` to cancel it first.")
+        return
+        
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(message, "⚠️ Link missing! Aise bhejein:\n`/run https://www.instagram.com/reel/xyz/`", parse_mode="Markdown")
+        bot.reply_to(message, "⚠️ Link missing!\nUsage: `/run <link> <time> <step>`\nExample: `/run https://reel_link 21:40 3`", parse_mode="Markdown")
         return
+    
     link = parts[1]
-    threading.Thread(target=run_campaign, args=(message.chat.id, link)).start()
+    start_time_str = parts[2] if len(parts) >= 3 else None
+    
+    # Step parsing (Default step = 1)
+    start_step = 1
+    if len(parts) >= 4:
+        try:
+            start_step = int(parts[3])
+            if start_step < 1 or start_step > 8:
+                start_step = 1
+        except ValueError:
+            start_step = 1
+    
+    threading.Thread(target=run_campaign, args=(message.chat.id, link, start_time_str, start_step)).start()
 
-# --- FIXED DUMMY SERVER FOR RENDER & CRON-JOB.ORG ---
+# --- FIXED DUMMY SERVER FOR RENDER ---
 class DummyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -130,7 +263,7 @@ def keep_alive():
         httpd.serve_forever()
 
 threading.Thread(target=keep_alive, daemon=True).start()
-# ----------------------------------------------------
+# -------------------------------------
 
 print("🤖 Telegram Bot is Active!")
 while True:
