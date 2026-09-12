@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 BOT_TOKEN = "8901542723:AAFd54ZpaMc9DyOdqEKp6KFsEXlFMzgygYU"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-API_KEY = "e162df9b7dce5201f22c0decd4d4dff931c9904c708e1342b9da9b086e32b1ac"
+API_KEY = "7880836150:AAE_g3LC9ZY3Vy9wwhgL7znE0ei4lvfstXk"
 API_URL = "https://yoyomedia.com/api/v2"
 
 SERVICE_VIEWS = 4480
@@ -18,14 +18,14 @@ SERVICE_LIKES = 4731
 
 # Exact Sheet Schedule (3:00 PM se start)
 SCHEDULE = [
-    {"time": "19:00", "views": 117, "likes": 0},   # 1st hour
-    {"time": "20:00", "views": 348, "likes": 0},   # 2nd hour
-    {"time": "21:00", "views": 765, "likes": 0},   # 3rd hour
-    {"time": "22:00", "views": 1630, "likes": 10}, # 4th hour
-    {"time": "23:00", "views": 2404, "likes": 12}, # 5th hour
-    {"time": "24:00", "views": 2736, "likes": 15}, # 6th hour
-    {"time": "25:00", "views": 2896, "likes": 16}, # 7th hour
-    {"time": "26:00", "views": 3003, "likes": 17}, # 8th hour
+    {"time": "15:50", "views": 117, "likes": 0},   # 1st hour
+    {"time": "16:50", "views": 348, "likes": 0},   # 2nd hour
+    {"time": "17:50", "views": 765, "likes": 0},   # 3rd hour
+    {"time": "18:50", "views": 1630, "likes": 10}, # 4th hour
+    {"time": "19:50", "views": 2404, "likes": 12}, # 5th hour
+    {"time": "20:50", "views": 2736, "likes": 15}, # 6th hour
+    {"time": "21:50", "views": 2896, "likes": 16}, # 7th hour
+    {"time": "22:50", "views": 3003, "likes": 17}, # 8th hour
 ]
 
 def place_order(service_id, link, quantity):
