@@ -4,11 +4,10 @@ import time
 import threading
 import os
 import socketserver
-import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 
-# Bot Token & Config
+# Bot Token & Config (@Secondoo_bot / Bot 2)
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8959503657:AAFutbdLkq8YW9y6d5C3gqcdmNk0UzDd2yI")
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -18,7 +17,7 @@ API_URL = "https://yoyomedia.com/api/v2"
 SERVICE_VIEWS = 4480
 SERVICE_LIKES = 4731
 
-ALLOWED_ADMINS = []
+ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 
 campaign_running = False
 stop_campaign_flag = False
@@ -37,11 +36,10 @@ STEPS_DATA = [
 ]
 
 def check_admin(message):
-    global ALLOWED_ADMINS
-    chat_id = message.chat.id
-    if not ALLOWED_ADMINS:
-        ALLOWED_ADMINS.append(chat_id)
-    return chat_id in ALLOWED_ADMINS
+    global ADMIN_ID
+    if ADMIN_ID == 0:
+        ADMIN_ID = message.chat.id
+    return message.chat.id == ADMIN_ID
 
 def place_order(service_id, link, quantity):
     if quantity <= 0:
@@ -63,7 +61,7 @@ def get_balance():
         data = res.json()
         if "balance" in data:
             usd_bal = float(data['balance'])
-            usd_to_inr_rate = 83.50
+            usd_to_inr_rate = 83.50  # 1 USD = ~83.50 INR
             inr_bal = usd_bal * usd_to_inr_rate
             
             return (
@@ -77,12 +75,11 @@ def get_balance():
         return f"❌ Error fetching balance: {e}"
 
 def get_ist_now():
-    return datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=5, minutes=30)
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
 def smart_sleep(seconds):
     global stop_campaign_flag
-    chunks = int(seconds * 2)
-    for _ in range(max(1, chunks)):
+    for _ in range(int(seconds * 2)):
         if stop_campaign_flag:
             break
         time.sleep(0.5)
@@ -94,11 +91,12 @@ def run_campaign(chat_id, link, start_time_str, start_step):
     
     now = get_ist_now()
     
+    # Time Parsing
     if start_time_str:
         try:
             sh, sm = map(int, start_time_str.split(":"))
             start_dt = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
-            if start_dt < (now - timedelta(minutes=5)):
+            if start_dt < now and (now - start_dt).total_seconds() > 300:
                 start_dt = start_dt + timedelta(days=1)
         except Exception:
             start_dt = now
@@ -136,12 +134,12 @@ def run_campaign(chat_id, link, start_time_str, start_step):
         v_qty = step["views"]
         l_qty = step["likes"]
         
-        # Wait logic without freezing
-        while not stop_campaign_flag:
+        while True:
+            if stop_campaign_flag:
+                break
+                
             current_ist = get_ist_now()
-            wait_seconds = (target_dt - current_ist).total_seconds()
-            
-            if wait_seconds <= 2:
+            if current_ist >= target_dt:
                 msg = f"⏰ <b>Batch/Step {actual_step_num}/8 ({target_time_str} IST)</b>\n"
                 
                 if v_qty > 0:
@@ -159,11 +157,10 @@ def run_campaign(chat_id, link, start_time_str, start_step):
                         msg += f"❤️ Likes (+{l_qty}): ❌ Panel Error"
                         
                 bot.send_message(chat_id, msg, parse_mode="HTML")
-                smart_sleep(2)
+                smart_sleep(5)
                 break
             else:
-                sleep_chunk = min(wait_seconds, 15)
-                smart_sleep(sleep_chunk)
+                smart_sleep(5)
                 
     if stop_campaign_flag:
         bot.send_message(chat_id, "🛑 <b>Campaign Stopped Successfully!</b>", parse_mode="HTML")
@@ -184,6 +181,7 @@ def send_welcome(message):
         "👋 <b>Welcome Boss! Campaign Bot Control Panel</b>\n\n"
         "📌 <b>Available Commands:</b>\n"
         "🔹 <code>/run &lt;link&gt; &lt;time&gt; &lt;step&gt;</code> - Start campaign\n"
+        "   <i>Example:</i> <code>/run https://reel_link 10:30 3</code>\n\n"
         "🔹 <code>/balance</code> - Check SMM Panel Balance in INR (₹)\n"
         "🔹 <code>/status</code> - Check Running Campaign Status\n"
         "🔹 <code>/stop</code> - Cancel/Stop Active Campaign"
@@ -251,7 +249,7 @@ def handle_run(message):
     
     threading.Thread(target=run_campaign, args=(message.chat.id, link, start_time_str, start_step)).start()
 
-# --- FIXED DUMMY SERVER WITH SELF-PING FOR RENDER ---
+# --- FIXED DUMMY SERVER FOR RENDER ---
 class DummyServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -270,20 +268,8 @@ def keep_alive():
     with socketserver.TCPServer(("0.0.0.0", port), DummyServer) as httpd:
         httpd.serve_forever()
 
-def self_ping():
-    """Keeps Render instance awake 24/7 by pinging local server every 3 minutes."""
-    port = int(os.environ.get("PORT", 8080))
-    url = f"http://127.0.0.1:{port}"
-    while True:
-        time.sleep(180) # 3 Minutes
-        try:
-            urllib.request.urlopen(url)
-        except Exception:
-            pass
-
 threading.Thread(target=keep_alive, daemon=True).start()
-threading.Thread(target=self_ping, daemon=True).start()
-# ---------------------------------------------------
+# -------------------------------------
 
 print("🤖 Telegram Bot is Active!")
 while True:
