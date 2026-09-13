@@ -7,7 +7,7 @@ import socketserver
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 
-# Naya Revoked Bot Token (@Darkzzzo_bot)
+# Bot Token & Config
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8959503657:AAFutbdLkq8YW9y6d5C3gqcdmNk0UzDd2yI")
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -61,7 +61,7 @@ def get_balance():
         data = res.json()
         if "balance" in data:
             usd_bal = float(data['balance'])
-            usd_to_inr_rate = 83.50  # 1 USD = ~83.50 INR
+            usd_to_inr_rate = 83.50
             inr_bal = usd_bal * usd_to_inr_rate
             
             return (
@@ -77,6 +77,13 @@ def get_balance():
 def get_ist_now():
     return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
+def smart_sleep(seconds):
+    global stop_campaign_flag
+    for _ in range(int(seconds * 2)):
+        if stop_campaign_flag:
+            break
+        time.sleep(0.5)
+
 def run_campaign(chat_id, link, start_time_str, start_step):
     global campaign_running, stop_campaign_flag, current_campaign_info
     campaign_running = True
@@ -84,7 +91,6 @@ def run_campaign(chat_id, link, start_time_str, start_step):
     
     now = get_ist_now()
     
-    # Time Parsing
     if start_time_str:
         try:
             sh, sm = map(int, start_time_str.split(":"))
@@ -96,7 +102,6 @@ def run_campaign(chat_id, link, start_time_str, start_step):
     else:
         start_dt = now
 
-    # Slice steps from start_step - 1 to end
     steps_to_run = STEPS_DATA[start_step-1:]
 
     current_campaign_info = {
@@ -106,17 +111,17 @@ def run_campaign(chat_id, link, start_time_str, start_step):
         "total_steps": 8
     }
 
+    # Safe text formatting without Markdown crash
     msg_start = (
-        f"🚀 *Campaign Scheduled!*\n"
-        f"🔗 **Link:** {link}\n"
-        f"⏰ **Start Time:** `{start_dt.strftime('%I:%M %p')} IST`\n"
-        f"🔢 **Starting from Batch/Step:** `{start_step}`"
+        f"🚀 <b>Campaign Scheduled!</b>\n"
+        f"🔗 <b>Link:</b> {link}\n"
+        f"⏰ <b>Start Time:</b> <code>{start_dt.strftime('%I:%M %p')} IST</code>\n"
+        f"🔢 <b>Starting from Batch/Step:</b> <code>{start_step}</code>"
     )
-    bot.send_message(chat_id, msg_start, parse_mode="Markdown")
+    bot.send_message(chat_id, msg_start, parse_mode="HTML")
     
     for relative_idx, step in enumerate(steps_to_run):
         if stop_campaign_flag:
-            bot.send_message(chat_id, "🛑 **Campaign Stopped by User!**", parse_mode="Markdown")
             break
             
         actual_step_num = start_step + relative_idx
@@ -135,7 +140,7 @@ def run_campaign(chat_id, link, start_time_str, start_step):
                 
             current_ist = get_ist_now()
             if current_ist >= target_dt:
-                msg = f"⏰ *Batch/Step {actual_step_num}/8 ({target_time_str} IST)*\n"
+                msg = f"⏰ <b>Batch/Step {actual_step_num}/8 ({target_time_str} IST)</b>\n"
                 
                 if v_qty > 0:
                     v_res = place_order(SERVICE_VIEWS, link, v_qty)
@@ -151,15 +156,18 @@ def run_campaign(chat_id, link, start_time_str, start_step):
                     else:
                         msg += f"❤️ Likes (+{l_qty}): ❌ Panel Error"
                         
-                bot.send_message(chat_id, msg, parse_mode="Markdown")
-                time.sleep(5)
+                bot.send_message(chat_id, msg, parse_mode="HTML")
+                smart_sleep(5)
                 break
             else:
-                time.sleep(15)
+                smart_sleep(5)
                 
+    if stop_campaign_flag:
+        bot.send_message(chat_id, "🛑 <b>Campaign Stopped Successfully!</b>", parse_mode="HTML")
+    else:
+        bot.send_message(chat_id, "🎉 <b>Full Campaign Successfully Completed!</b>", parse_mode="HTML")
+        
     campaign_running = False
-    if not stop_campaign_flag:
-        bot.send_message(chat_id, "🎉 *Full Campaign Successfully Completed!*", parse_mode="Markdown")
 
 # --- BOT COMMAND HANDLERS ---
 
@@ -170,23 +178,21 @@ def send_welcome(message):
         return
         
     welcome_txt = (
-        "👋 **Welcome Boss! Campaign Bot Control Panel**\n\n"
-        "📌 **Available Commands:**\n"
-        "🔹 `/run <link> <time> <step>` - Start campaign\n"
-        "   *Example (Full Run from Step 1):* `/run https://reel_link 20:30`\n"
-        "   *Example (Start from Step 3):* `/run https://reel_link 21:40 3`\n\n"
-        "🔹 `/balance` - Check SMM Panel Balance in INR (₹)\n"
-        "🔹 `/status` - Check Running Campaign Status\n"
-        "🔹 `/stop` - Cancel/Stop Active Campaign"
+        "👋 <b>Welcome Boss! Campaign Bot Control Panel</b>\n\n"
+        "📌 <b>Available Commands:</b>\n"
+        "🔹 <code>/run &lt;link&gt; &lt;time&gt; &lt;step&gt;</code> - Start campaign\n"
+        "🔹 <code>/balance</code> - Check SMM Panel Balance in INR (₹)\n"
+        "🔹 <code>/status</code> - Check Running Campaign Status\n"
+        "🔹 <code>/stop</code> - Cancel/Stop Active Campaign"
     )
-    bot.reply_to(message, welcome_txt, parse_mode="Markdown")
+    bot.reply_to(message, welcome_txt, parse_mode="HTML")
 
 @bot.message_handler(commands=['balance'])
 def handle_balance(message):
     if not check_admin(message):
         return
     bal_msg = get_balance()
-    bot.reply_to(message, bal_msg, parse_mode="Markdown")
+    bot.reply_to(message, bal_msg, parse_mode="HTML")
 
 @bot.message_handler(commands=['status'])
 def handle_status(message):
@@ -194,23 +200,23 @@ def handle_status(message):
         return
     if campaign_running:
         info = (
-            f"📊 **Active Campaign Status:**\n\n"
-            f"🔗 **Link:** {current_campaign_info.get('link')}\n"
-            f"📈 **Completed Steps:** {current_campaign_info.get('completed_steps')}/8\n"
-            f"⏰ **Next Step Time:** {current_campaign_info.get('next_step_time', 'Executing now')}"
+            f"📊 <b>Active Campaign Status:</b>\n\n"
+            f"🔗 <b>Link:</b> {current_campaign_info.get('link')}\n"
+            f"📈 <b>Completed Steps:</b> {current_campaign_info.get('completed_steps')}/8\n"
+            f"⏰ <b>Next Step Time:</b> {current_campaign_info.get('next_step_time', 'Executing now')}"
         )
     else:
         info = "ℹ️ No campaign is currently running."
-    bot.reply_to(message, info, parse_mode="Markdown")
+    bot.reply_to(message, info, parse_mode="HTML")
 
 @bot.message_handler(commands=['stop'])
 def handle_stop(message):
-    global stop_campaign_flag
+    global stop_campaign_flag, campaign_running
     if not check_admin(message):
         return
     if campaign_running:
         stop_campaign_flag = True
-        bot.reply_to(message, "⏳ Stopping campaign, please wait...")
+        bot.reply_to(message, "🛑 <b>Stopping campaign immediately...</b>", parse_mode="HTML")
     else:
         bot.reply_to(message, "ℹ️ No active campaign to stop.")
 
@@ -225,13 +231,12 @@ def handle_run(message):
         
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(message, "⚠️ Link missing!\nUsage: `/run <link> <time> <step>`\nExample: `/run https://reel_link 21:40 3`", parse_mode="Markdown")
+        bot.reply_to(message, "⚠️ Link missing!\nUsage: `/run <link> <time> <step>`")
         return
     
     link = parts[1]
     start_time_str = parts[2] if len(parts) >= 3 else None
     
-    # Step parsing (Default step = 1)
     start_step = 1
     if len(parts) >= 4:
         try:
