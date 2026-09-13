@@ -7,7 +7,7 @@ import socketserver
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 
-# Bot Token & Config (@Darkzzzo_bot)
+# Naya Revoked Bot Token (@Darkzzzo_bot)
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8959503657:AAFutbdLkq8YW9y6d5C3gqcdmNk0UzDd2yI")
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -272,4 +272,3 @@ while True:
     except Exception as e:
         print(f"Connection lost: {e}. Reconnecting in 5 seconds...")
         time.sleep(5)
-        
