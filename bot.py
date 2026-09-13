@@ -4,7 +4,7 @@ import time
 import threading
 import os
 import socketserver
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 
 # Bot Token & Config
@@ -17,7 +17,7 @@ API_URL = "https://yoyomedia.com/api/v2"
 SERVICE_VIEWS = 4480
 SERVICE_LIKES = 4731
 
-ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
+ALLOWED_ADMINS = []
 
 campaign_running = False
 stop_campaign_flag = False
@@ -36,10 +36,11 @@ STEPS_DATA = [
 ]
 
 def check_admin(message):
-    global ADMIN_ID
-    if ADMIN_ID == 0:
-        ADMIN_ID = message.chat.id
-    return message.chat.id == ADMIN_ID
+    global ALLOWED_ADMINS
+    chat_id = message.chat.id
+    if not ALLOWED_ADMINS:
+        ALLOWED_ADMINS.append(chat_id)
+    return chat_id in ALLOWED_ADMINS
 
 def place_order(service_id, link, quantity):
     if quantity <= 0:
@@ -75,10 +76,10 @@ def get_balance():
         return f"❌ Error fetching balance: {e}"
 
 def get_ist_now():
-    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+    # Deprecation warning fixed using timezone.utc
+    return datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=5, minutes=30)
 
 def smart_sleep(seconds):
-    """Sleeps in small chunks so /stop command can instantly interrupt it."""
     global stop_campaign_flag
     chunks = int(seconds * 2)
     for _ in range(max(1, chunks)):
@@ -93,7 +94,6 @@ def run_campaign(chat_id, link, start_time_str, start_step):
     
     now = get_ist_now()
     
-    # Time Parsing
     if start_time_str:
         try:
             sh, sm = map(int, start_time_str.split(":"))
@@ -136,7 +136,6 @@ def run_campaign(chat_id, link, start_time_str, start_step):
         v_qty = step["views"]
         l_qty = step["likes"]
         
-        # Calculate exact seconds to wait until target_dt
         while True:
             if stop_campaign_flag:
                 break
@@ -145,7 +144,6 @@ def run_campaign(chat_id, link, start_time_str, start_step):
             wait_seconds = (target_dt - current_ist).total_seconds()
             
             if wait_seconds <= 0:
-                # Target time reached -> Execute Order!
                 msg = f"⏰ <b>Batch/Step {actual_step_num}/8 ({target_time_str} IST)</b>\n"
                 
                 if v_qty > 0:
@@ -165,7 +163,6 @@ def run_campaign(chat_id, link, start_time_str, start_step):
                 bot.send_message(chat_id, msg, parse_mode="HTML")
                 break
             else:
-                # Sleep safely depending on how much time is left
                 sleep_duration = min(wait_seconds, 30)
                 smart_sleep(sleep_duration)
                 
