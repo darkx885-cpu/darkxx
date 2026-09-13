@@ -65,9 +65,9 @@ def get_balance():
             inr_bal = usd_bal * usd_to_inr_rate
             
             return (
-                f"💵 **Panel Balance:**\n"
-                f"🇮🇳 **₹{inr_bal:.2f} INR**\n"
-                f"🇺🇸 `${usd_bal:.2f} USD`"
+                f"💵 <b>Panel Balance:</b>\n"
+                f"🇮🇳 <b>₹{inr_bal:.2f} INR</b>\n"
+                f"🇺🇸 <code>${usd_bal:.2f} USD</code>"
             )
         else:
             return "❌ Unable to fetch balance."
@@ -78,8 +78,10 @@ def get_ist_now():
     return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
 def smart_sleep(seconds):
+    """Sleeps in small chunks so /stop command can instantly interrupt it."""
     global stop_campaign_flag
-    for _ in range(int(seconds * 2)):
+    chunks = int(seconds * 2)
+    for _ in range(max(1, chunks)):
         if stop_campaign_flag:
             break
         time.sleep(0.5)
@@ -91,6 +93,7 @@ def run_campaign(chat_id, link, start_time_str, start_step):
     
     now = get_ist_now()
     
+    # Time Parsing
     if start_time_str:
         try:
             sh, sm = map(int, start_time_str.split(":"))
@@ -111,7 +114,6 @@ def run_campaign(chat_id, link, start_time_str, start_step):
         "total_steps": 8
     }
 
-    # Safe text formatting without Markdown crash
     msg_start = (
         f"🚀 <b>Campaign Scheduled!</b>\n"
         f"🔗 <b>Link:</b> {link}\n"
@@ -134,12 +136,16 @@ def run_campaign(chat_id, link, start_time_str, start_step):
         v_qty = step["views"]
         l_qty = step["likes"]
         
+        # Calculate exact seconds to wait until target_dt
         while True:
             if stop_campaign_flag:
                 break
                 
             current_ist = get_ist_now()
-            if current_ist >= target_dt:
+            wait_seconds = (target_dt - current_ist).total_seconds()
+            
+            if wait_seconds <= 0:
+                # Target time reached -> Execute Order!
                 msg = f"⏰ <b>Batch/Step {actual_step_num}/8 ({target_time_str} IST)</b>\n"
                 
                 if v_qty > 0:
@@ -157,10 +163,11 @@ def run_campaign(chat_id, link, start_time_str, start_step):
                         msg += f"❤️ Likes (+{l_qty}): ❌ Panel Error"
                         
                 bot.send_message(chat_id, msg, parse_mode="HTML")
-                smart_sleep(5)
                 break
             else:
-                smart_sleep(5)
+                # Sleep safely depending on how much time is left
+                sleep_duration = min(wait_seconds, 30)
+                smart_sleep(sleep_duration)
                 
     if stop_campaign_flag:
         bot.send_message(chat_id, "🛑 <b>Campaign Stopped Successfully!</b>", parse_mode="HTML")
