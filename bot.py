@@ -3,6 +3,7 @@ import requests
 import time
 import threading
 import os
+import html
 import socketserver
 import urllib.request
 from urllib.parse import urlparse
@@ -10,9 +11,9 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 
 # =====================================================================
-# 🤖 BOT CONFIGURATION (@Secondoo_bot)
+# 🤖 FRESH BOT CONFIGURATION
 # =====================================================================
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8901542723:AAFd54ZpaMc9DyOdqEKp6KFsEXlFMzgygYU")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8631983010:AAFc466k0LIu10i_wErRu5CU2f6tulz3AsM")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # =====================================================================
@@ -28,6 +29,7 @@ LIKES_PANEL_URL = "https://smmpanelpak.com/api/v2"
 LIKES_API_KEY = "1e3299898a440382ee5e410d11d3c9de5d1ff3a4"
 SERVICE_LIKES = 4152   # Instagram Likes
 
+# Full Browser Headers for 100% Cloudflare Bypass
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Accept': '*/*',
@@ -37,8 +39,11 @@ HEADERS = {
     'Referer': 'https://smmpanelpak.com/'
 }
 
+# =====================================================================
+# 👥 ADMIN & AUTHORIZATION
+# =====================================================================
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
-ALLOWED_USERS = [8207879798]
+ALLOWED_USERS = [8207879798]  # Pre-authorized team user
 
 campaign_running = False
 stop_campaign_flag = False
@@ -66,7 +71,7 @@ STEPS_DATA = [
     {"step": 16, "interval_mins": 390, "views": 135, "likes": 11, "label": "6:30 hr"},
     {"step": 17, "interval_mins": 420, "views": 120, "likes": 14, "label": "7:00 hr"},
     {"step": 18, "interval_mins": 450, "views": 110, "likes": 0,  "label": "7:30 hr"},
-    {"step": 19, "interval_mins": 480, "views": 105, "likes": 0,  "label": "8:00 hr"}
+    {"step": 19, "interval_mins": 480, "views": 105, "likes": 0,  "label": "8:00 hr (Final)"},
 ]
 
 TOTAL_VIEWS = sum(s["views"] for s in STEPS_DATA)  # 3,900
@@ -75,6 +80,14 @@ TOTAL_LIKES = sum(s["likes"] for s in STEPS_DATA)  # 123
 # =====================================================================
 # 🛠️ HELPER FUNCTIONS
 # =====================================================================
+def send_safe_msg(chat_id, text, disable_web_page_preview=True):
+    """Safely sends HTML message; falls back to plain text if parse error occurs."""
+    try:
+        return bot.send_message(chat_id, text, parse_mode="HTML", disable_web_page_preview=disable_web_page_preview)
+    except Exception:
+        clean_text = text.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "").replace("<i>", "").replace("</i>", "")
+        return bot.send_message(chat_id, clean_text, parse_mode=None, disable_web_page_preview=disable_web_page_preview)
+
 def check_authorized(message):
     global ADMIN_ID, ALLOWED_USERS
     user_id = message.chat.id
@@ -86,11 +99,17 @@ def check_authorized(message):
     return user_id == ADMIN_ID or user_id in ALLOWED_USERS
 
 def clean_instagram_link(link: str) -> str:
-    parsed = urlparse(link.strip())
-    return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    try:
+        parsed = urlparse(link.strip())
+        clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        if not clean.endswith("/"):
+            clean += "/"
+        return clean
+    except Exception:
+        return link.strip()
 
 def place_views_order(link, quantity):
-    """Place Views Order on YoyoMedia"""
+    """Place Views Order on YoyoMedia with 3x Auto-Retry"""
     if quantity <= 0:
         return None
     payload = {
@@ -100,17 +119,23 @@ def place_views_order(link, quantity):
         "link": link,
         "quantity": quantity
     }
-    try:
-        res = requests.post(VIEWS_PANEL_URL, data=payload, headers=HEADERS, timeout=30)
+    last_err = "Server returned invalid response"
+    for attempt in range(3):
         try:
-            return res.json()
-        except Exception:
-            return {"error": res.text[:200]}
-    except Exception as e:
-        return {"error": str(e)}
+            res = requests.post(VIEWS_PANEL_URL, data=payload, headers=HEADERS, timeout=30)
+            try:
+                data = res.json()
+                if "order" in data or "error" in data:
+                    return data
+            except Exception:
+                pass
+        except Exception as e:
+            last_err = str(e)
+        time.sleep(2)
+    return {"error": last_err}
 
 def place_likes_order(link, quantity):
-    """Place Likes Order on SMMPanelPak"""
+    """Place Likes Order on SMMPanelPak with 3x Auto-Retry"""
     if quantity <= 0:
         return None
     payload = {
@@ -120,46 +145,61 @@ def place_likes_order(link, quantity):
         "link": link,
         "quantity": quantity
     }
-    try:
-        res = requests.post(LIKES_PANEL_URL, data=payload, headers=HEADERS, timeout=30)
+    last_err = "Server returned invalid response"
+    for attempt in range(3):
         try:
-            return res.json()
-        except Exception:
-            return {"error": res.text[:200]}
-    except Exception as e:
-        return {"error": str(e)}
+            res = requests.post(LIKES_PANEL_URL, data=payload, headers=HEADERS, timeout=30)
+            try:
+                data = res.json()
+                if "order" in data or "error" in data:
+                    return data
+            except Exception:
+                pass
+        except Exception as e:
+            last_err = str(e)
+        time.sleep(2)
+    return {"error": last_err}
 
 def get_dual_balance():
     # 1. YoyoMedia Views Balance
-    v_msg = "❌ Error"
-    try:
-        res_v = requests.post(VIEWS_PANEL_URL, data={"key": VIEWS_API_KEY, "action": "balance"}, headers=HEADERS, timeout=20)
-        data_v = res_v.json()
-        if "balance" in data_v:
-            usd_bal = float(data_v['balance'])
-            inr_bal = usd_bal * 83.50
-            v_msg = f"${usd_bal:.2f} USD (₹{inr_bal:.2f} INR)"
-        elif "error" in data_v:
-            v_msg = data_v["error"]
-    except Exception as e:
-        v_msg = str(e)
+    v_msg = "❌ Error fetching balance"
+    for _ in range(3):
+        try:
+            res_v = requests.post(VIEWS_PANEL_URL, data={"key": VIEWS_API_KEY, "action": "balance"}, headers=HEADERS, timeout=20)
+            data_v = res_v.json()
+            if "balance" in data_v:
+                usd_bal = float(data_v['balance'])
+                inr_bal = usd_bal * 83.50
+                v_msg = f"${usd_bal:.2f} USD (₹{inr_bal:.2f} INR)"
+                break
+            elif "error" in data_v:
+                v_msg = f"❌ {html.escape(str(data_v['error']))}"
+        except Exception:
+            time.sleep(1)
 
     # 2. SMMPanelPak Likes Balance
-    l_msg = "❌ Error"
-    try:
-        res_l = requests.post(LIKES_PANEL_URL, data={"key": LIKES_API_KEY, "action": "balance"}, headers=HEADERS, timeout=20)
-        data_l = res_l.json()
-        if "balance" in data_l:
-            usd_bal = float(data_l['balance'])
-            inr_bal = usd_bal * 83.50
-            l_msg = f"${usd_bal:.2f} USD (₹{inr_bal:.2f} INR)"
-        elif "error" in data_l:
-            l_msg = data_l["error"]
-    except Exception as e:
-        l_msg = str(e)
+    l_msg = "❌ Error fetching balance"
+    for _ in range(3):
+        try:
+            res_l = requests.post(LIKES_PANEL_URL, data={"key": LIKES_API_KEY, "action": "balance"}, headers=HEADERS, timeout=20)
+            data_l = res_l.json()
+            if "balance" in data_l:
+                usd_bal = float(data_l['balance'])
+                inr_bal = usd_bal * 83.50
+                curr = data_l.get('currency', 'USD')
+                if curr.upper() == "PKR":
+                    l_msg = f"{usd_bal:.2f} PKR"
+                else:
+                    l_msg = f"${usd_bal:.2f} USD (₹{inr_bal:.2f} INR)"
+                break
+            elif "error" in data_l:
+                l_msg = f"❌ {html.escape(str(data_l['error']))}"
+        except Exception:
+            time.sleep(1)
 
     return (
-        f"💵 <b>Dual-Panel Balances:</b>\n\n"
+        f"💳 <b>Dual Panel Live Balances:</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
         f"👁️ <b>YoyoMedia (Views):</b> <code>{v_msg}</code>\n"
         f"❤️ <b>SMMPanelPak (Likes):</b> <code>{l_msg}</code>"
     )
@@ -178,9 +218,9 @@ def smart_sleep(seconds):
         elapsed += chunk
 
 # =====================================================================
-# 🚀 19-STEP DUAL-PANEL CAMPAIGN WORKER
+# 🚀 CAMPAIGN EXECUTION ENGINE (19 STEPS DUAL PANEL)
 # =====================================================================
-def run_campaign(chat_id, raw_link, start_time_str, start_step):
+def run_campaign(chat_id, raw_link, start_time_str=None, start_step=1):
     global campaign_running, stop_campaign_flag, current_campaign_info
     campaign_running = True
     stop_campaign_flag = False
@@ -188,7 +228,6 @@ def run_campaign(chat_id, raw_link, start_time_str, start_step):
     link = clean_instagram_link(raw_link)
     now = get_ist_now()
 
-    # Time Parsing
     if start_time_str:
         try:
             sh, sm = map(int, start_time_str.split(":"))
@@ -200,171 +239,204 @@ def run_campaign(chat_id, raw_link, start_time_str, start_step):
     else:
         start_dt = now
 
-    steps_to_run = STEPS_DATA[start_step - 1:]
+    while get_ist_now() < start_dt:
+        if stop_campaign_flag:
+            break
+        diff = (start_dt - get_ist_now()).total_seconds()
+        smart_sleep(min(diff, 10))
+
+    if stop_campaign_flag:
+        campaign_running = False
+        send_safe_msg(chat_id, "🛑 <b>Campaign Cancelled before start!</b>")
+        return
+
+    initial_views = sum(STEPS_DATA[i]["views"] for i in range(start_step - 1))
+    initial_likes = sum(STEPS_DATA[i]["likes"] for i in range(start_step - 1))
 
     current_campaign_info = {
         "link": link,
         "start_time": start_dt.strftime('%I:%M %p'),
         "completed_steps": start_step - 1,
-        "total_steps": len(STEPS_DATA),
-        "views_sent": 0,
-        "likes_sent": 0
+        "views_sent": initial_views,
+        "likes_sent": initial_likes,
+        "next_step_time": "Calculating..."
     }
 
-    msg_start = (
-        f"🚀 <b>Dual-Panel 19-Step Wave Started!</b>\n\n"
-        f"🔗 <b>Link:</b> {link}\n"
+    step1_time = (start_dt + timedelta(minutes=STEPS_DATA[start_step - 1]["interval_mins"])).strftime('%I:%M %p')
+
+    start_msg = (
+        f"🚀 <b>19-Step Wave Campaign Started!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔗 <b>Target:</b> <code>{link}</code>\n"
         f"⏰ <b>Start Time:</b> <code>{start_dt.strftime('%I:%M %p')} IST</code>\n"
-        f"🔢 <b>Starting Step:</b> <code>{start_step}/19</code>\n\n"
-        f"👁️ <b>Views Panel:</b> YoyoMedia (Service #{SERVICE_VIEWS}) ➔ {TOTAL_VIEWS:,} Views\n"
-        f"❤️ <b>Likes Panel:</b> SMMPanelPak (Service #{SERVICE_LIKES}) ➔ {TOTAL_LIKES} Likes\n"
-        f"⏱️ <b>Schedule:</b> 19 Steps over 8 Hours"
+        f"🏁 <b>Est Completion:</b> <code>{(start_dt + timedelta(minutes=480)).strftime('%I:%M %p')} IST</code>\n"
+        f"📈 <b>Starting at:</b> Step {start_step} / 19\n"
+        f"⏳ <b>Next: Step {start_step} at:</b> <code>{step1_time} IST</code>\n\n"
+        f"📊 <b>Total Target:</b> <code>{TOTAL_VIEWS:,} Views</code> • <code>{TOTAL_LIKES} Likes</code>\n"
+        f"🌐 <b>Views Panel:</b> YoyoMedia (Service #{SERVICE_VIEWS})\n"
+        f"🌐 <b>Likes Panel:</b> SMMPanelPak (Service #{SERVICE_LIKES})"
     )
-    bot.send_message(chat_id, msg_start, parse_mode="HTML", disable_web_page_preview=True)
+    send_safe_msg(chat_id, start_msg)
 
-    total_views = 0
-    total_likes = 0
+    step_events = [
+        (start_dt + timedelta(minutes=step["interval_mins"]), step["step"], step["views"], step["likes"], step["label"])
+        for step in STEPS_DATA
+    ]
 
-    for relative_idx, step in enumerate(steps_to_run):
+    for idx in range(start_step - 1, len(step_events)):
         if stop_campaign_flag:
             break
 
-        actual_step_num = start_step + relative_idx
-        target_mins = step["interval_mins"]
-        target_dt = start_dt + timedelta(minutes=target_mins)
-        target_time_str = target_dt.strftime("%I:%M %p")
+        target_time, step_num, v_qty, l_qty, label = step_events[idx]
+        current_campaign_info["next_step_time"] = target_time.strftime('%I:%M %p')
 
-        current_campaign_info["completed_steps"] = actual_step_num - 1
-        current_campaign_info["next_step_time"] = target_time_str
-
-        v_qty = step["views"]
-        l_qty = step["likes"]
-
-        while True:
+        while get_ist_now() < target_time:
             if stop_campaign_flag:
                 break
-            current_ist = get_ist_now()
-            if current_ist >= target_dt:
-                msg = f"⏰ <b>Step {actual_step_num}/19 ({target_time_str} IST) — {step['label']}</b>\n"
+            diff = (target_time - get_ist_now()).total_seconds()
+            smart_sleep(min(diff, 10))
 
-                # 1. Place Views on YoyoMedia
-                if v_qty > 0:
-                    v_res = place_views_order(link, v_qty)
-                    if v_res and "order" in v_res:
-                        msg += f"👁️ YoyoMedia Views (+{v_qty}): ✅ [ID: <code>{v_res['order']}</code>]\n"
-                        total_views += v_qty
-                    else:
-                        err = v_res.get("error", "Failed") if v_res else "Failed"
-                        msg += f"👁️ YoyoMedia Views (+{v_qty}): ❌ {err}\n"
+        if stop_campaign_flag:
+            break
 
-                # 2. Place Likes on SMMPanelPak
-                if l_qty > 0:
-                    time.sleep(2)
-                    l_res = place_likes_order(link, l_qty)
-                    if l_res and "order" in l_res:
-                        msg += f"❤️ SMMPanelPak Likes (+{l_qty}): ✅ [ID: <code>{l_res['order']}</code>]\n"
-                        total_likes += l_qty
-                    else:
-                        err = l_res.get("error", "Failed") if l_res else "Failed"
-                        msg += f"❤️ SMMPanelPak Likes (+{l_qty}): ❌ {err}\n"
+        # 1. YoyoMedia Views Order (with 3x Retry)
+        v_res = place_views_order(link, v_qty)
+        if v_res and "order" in v_res:
+            v_status = f"✅ YoyoMedia #<code>{v_res['order']}</code>"
+        elif v_res and "error" in v_res:
+            clean_err = html.escape(str(v_res['error']))[:50]
+            v_status = f"❌ Error: <code>{clean_err}</code>"
+        else:
+            v_status = "⚠️ Response error"
 
-                current_campaign_info["views_sent"] = total_views
-                current_campaign_info["likes_sent"] = total_likes
+        current_campaign_info["views_sent"] += v_qty
 
-                msg += f"📈 <b>Progress:</b> {total_views}/{TOTAL_VIEWS} views • {total_likes}/{TOTAL_LIKES} likes"
-
-                bot.send_message(chat_id, msg, parse_mode="HTML")
-                smart_sleep(5)
-                break
+        # 2. SMMPanelPak Likes Order (with 3x Retry)
+        l_status = "Skipped (+0)"
+        if l_qty > 0:
+            time.sleep(2)
+            l_res = place_likes_order(link, l_qty)
+            if l_res and "order" in l_res:
+                l_status = f"✅ SMMPanelPak #<code>{l_res['order']}</code>"
+            elif l_res and "error" in l_res:
+                clean_l_err = html.escape(str(l_res['error']))[:50]
+                l_status = f"❌ Error: <code>{clean_l_err}</code>"
             else:
-                wait_seconds = (target_dt - current_ist).total_seconds()
-                smart_sleep(min(wait_seconds, 15))
+                l_status = "⚠️ Response error"
+
+            current_campaign_info["likes_sent"] += l_qty
+
+        current_campaign_info["completed_steps"] = step_num
+
+        if idx + 1 < len(step_events):
+            next_t = step_events[idx + 1][0].strftime('%I:%M %p')
+            next_str = f"⏳ <b>Next:</b> Step {step_num + 1} at <code>{next_t} IST</code>"
+        else:
+            next_str = "🏁 <b>This was the Final Step!</b>"
+
+        step_msg = (
+            f"📦 <b>Step {step_num}/19 Executed ({label})</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👁️ <b>Views (+{v_qty}):</b> {v_status}\n"
+            f"❤️ <b>Likes (+{l_qty}):</b> {l_status}\n\n"
+            f"📊 <b>Delivered Total:</b>\n"
+            f"   • Views: <code>{current_campaign_info['views_sent']:,} / {TOTAL_VIEWS:,}</code>\n"
+            f"   • Likes: <code>{current_campaign_info['likes_sent']} / {TOTAL_LIKES}</code>\n"
+            f"{next_str}"
+        )
+        send_safe_msg(chat_id, step_msg)
 
     if stop_campaign_flag:
-        bot.send_message(chat_id, f"🛑 <b>Campaign Stopped!</b> Delivered {total_views} views & {total_likes} likes.", parse_mode="HTML")
-    else:
-        bot.send_message(
+        send_safe_msg(
             chat_id,
-            f"🎉 <b>Dual-Panel 19-Step Campaign Completed!</b>\n\n"
-            f"🔗 <b>Link:</b> {link}\n"
-            f"👁️ Total Views (YoyoMedia): <b>{total_views:,}</b>\n"
-            f"❤️ Total Likes (SMMPanelPak): <b>{total_likes}</b>\n"
-            f"🏆 All 19 steps finished successfully!",
-            parse_mode="HTML",
-            disable_web_page_preview=True
+            f"🛑 <b>Campaign Stopped by Admin!</b>\n"
+            f"📊 Views Delivered: {current_campaign_info['views_sent']:,}\n"
+            f"❤️ Likes Delivered: {current_campaign_info['likes_sent']}"
+        )
+    else:
+        send_safe_msg(
+            chat_id,
+            f"🎉 <b>19-Step Wave Campaign Completed 100%!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔗 <b>Target:</b> <code>{link}</code>\n"
+            f"👁️ <b>Total Views:</b> <b>{current_campaign_info['views_sent']:,} / {TOTAL_VIEWS:,}</b>\n"
+            f"❤️ <b>Total Likes:</b> <b>{current_campaign_info['likes_sent']} / {TOTAL_LIKES}</b>\n"
+            f"⏱️ <b>Total Duration:</b> 8 Hours Wave"
         )
 
     campaign_running = False
 
 # =====================================================================
-# 🤖 TELEGRAM BOT COMMAND HANDLERS
+# 💬 BOT COMMAND HANDLERS
 # =====================================================================
 @bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
+def handle_start(message):
     if not check_authorized(message):
-        bot.reply_to(message, f"⛔ Access Denied!\nAapka User ID: <code>{message.chat.id}</code>\nAdmin se access maangein.", parse_mode="HTML")
+        send_safe_msg(message.chat.id, "⛔ Access Denied! Please contact the Admin.")
         return
-    welcome_txt = (
-        "👋 <b>Welcome Boss! @Secondoo_bot Dual-Panel Control Panel</b>\n\n"
-        "📋 <b>19-Step Wave Schedule:</b>\n"
-        f"👁️ <b>Views Panel:</b> YoyoMedia (Service #{SERVICE_VIEWS}) ➔ {TOTAL_VIEWS:,} Views\n"
-        f"❤️ <b>Likes Panel:</b> SMMPanelPak (Service #{SERVICE_LIKES}) ➔ {TOTAL_LIKES} Likes\n\n"
-        "📌 <b>Campaign Commands:</b>\n"
-        "🔹 Send any <b>Instagram Reel/Post Link</b> to start instantly!\n"
-        "🔹 <code>/run &lt;link&gt;</code> — Immediate start\n"
-        "🔹 <code>/run &lt;link&gt; &lt;time&gt;</code> — Time par start karein (e.g. <code>/run https://... 16:30</code>)\n"
-        "🔹 <code>/run &lt;link&gt; &lt;step&gt;</code> — Specific step se shuru karein (e.g. <code>/run https://... 5</code>)\n"
-        "🔹 <code>/run &lt;link&gt; &lt;time&gt; &lt;step&gt;</code> — Time + Step\n\n"
-        "🔹 <code>/balance</code> — Check Dual-Panel Balances\n"
-        "🔹 <code>/status</code> — Check Live Progress & Next Step Time\n"
-        "🔹 <code>/stop</code> — Stop Active Campaign\n\n"
-        "👥 <b>Admin Team Access:</b>\n"
-        "🔹 <code>/adduser &lt;id&gt;</code> — Add user access\n"
-        "🔹 <code>/removeuser &lt;id&gt;</code> — Remove user access\n"
-        "🔹 <code>/users</code> — List authorized users\n"
-        f"🆔 <b>Your Telegram ID:</b> <code>{message.chat.id}</code>"
+    txt = (
+        f"👋 <b>Welcome to Wave Automation Bot!</b>\n"
+        f"<i>19-Step Wave (Views: YoyoMedia | Likes: SMMPanelPak)</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🚀 <b>Quick Start:</b> Just paste any Instagram Reel/Post link!\n\n"
+        f"📌 <b>Commands:</b>\n"
+        f"🔹 <code>/run &lt;link&gt;</code> - Turant start karein\n"
+        f"🔹 <code>/run &lt;link&gt; 16:30</code> - Scheduled time par start\n"
+        f"🔹 <code>/run &lt;link&gt; 5</code> - Step 5 se start\n"
+        f"🔹 <code>/balance</code> - Check Both Panels Balance\n"
+        f"🔹 <code>/status</code> - Live Campaign status\n"
+        f"🔹 <code>/schedule</code> - 19-Step time table\n"
+        f"🔹 <code>/stop</code> - Campaign cancel karein\n"
+        f"🔹 <code>/users</code> - Team members list\n"
+        f"🔹 <code>/adduser &lt;id&gt;</code> - Naye user ko add karein\n"
+        f"🔹 <code>/removeuser &lt;id&gt;</code> - User access revoke karein\n"
+        f"🔹 <code>/myid</code> - Telegram Chat ID"
     )
-    bot.reply_to(message, welcome_txt, parse_mode="HTML")
+    send_safe_msg(message.chat.id, txt)
+
+@bot.message_handler(commands=['myid'])
+def handle_myid(message):
+    send_safe_msg(message.chat.id, f"🆔 Aapki Telegram Chat ID hai: <code>{message.chat.id}</code>")
 
 @bot.message_handler(commands=['adduser'])
 def handle_adduser(message):
     global ADMIN_ID, ALLOWED_USERS
     if message.chat.id != ADMIN_ID:
-        bot.reply_to(message, "⛔ Only Main Admin can add users!")
+        send_safe_msg(message.chat.id, "⛔ Only Main Admin can add users!")
         return
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(message, "⚠️ Usage: <code>/adduser &lt;user_id&gt;</code>", parse_mode="HTML")
+        send_safe_msg(message.chat.id, "⚠️ Usage: <code>/adduser &lt;user_id&gt;</code>")
         return
     try:
         new_uid = int(parts[1])
         if new_uid not in ALLOWED_USERS:
             ALLOWED_USERS.append(new_uid)
-            bot.reply_to(message, f"✅ User <code>{new_uid}</code> ko bot access de diya gaya hai!", parse_mode="HTML")
+            send_safe_msg(message.chat.id, f"✅ User <code>{new_uid}</code> ko access de diya gaya!")
         else:
-            bot.reply_to(message, f"ℹ️ User <code>{new_uid}</code> already added hai.", parse_mode="HTML")
+            send_safe_msg(message.chat.id, f"ℹ️ User <code>{new_uid}</code> already added hai.")
     except ValueError:
-        bot.reply_to(message, "⚠️ Invalid User ID!")
+        send_safe_msg(message.chat.id, "⚠️ Invalid User ID!")
 
 @bot.message_handler(commands=['removeuser'])
 def handle_removeuser(message):
     global ADMIN_ID, ALLOWED_USERS
     if message.chat.id != ADMIN_ID:
-        bot.reply_to(message, "⛔ Only Main Admin can remove users!")
+        send_safe_msg(message.chat.id, "⛔ Only Main Admin can remove users!")
         return
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(message, "⚠️ Usage: <code>/removeuser &lt;user_id&gt;</code>", parse_mode="HTML")
+        send_safe_msg(message.chat.id, "⚠️ Usage: <code>/removeuser &lt;user_id&gt;</code>")
         return
     try:
         uid = int(parts[1])
         if uid in ALLOWED_USERS:
             ALLOWED_USERS.remove(uid)
-            bot.reply_to(message, f"🗑️ User <code>{uid}</code> ka access hata diya gaya!", parse_mode="HTML")
+            send_safe_msg(message.chat.id, f"🗑️ User <code>{uid}</code> ka access hata diya gaya!")
         else:
-            bot.reply_to(message, "ℹ️ User list me nahi hai.")
+            send_safe_msg(message.chat.id, "ℹ️ User list me nahi hai.")
     except ValueError:
-        bot.reply_to(message, "⚠️ Invalid User ID!")
+        send_safe_msg(message.chat.id, "⚠️ Invalid User ID!")
 
 @bot.message_handler(commands=['users'])
 def handle_list_users(message):
@@ -375,13 +447,24 @@ def handle_list_users(message):
     for u in ALLOWED_USERS:
         if u != ADMIN_ID:
             txt += f"🔹 <code>{u}</code>\n"
-    bot.reply_to(message, txt, parse_mode="HTML")
+    send_safe_msg(message.chat.id, txt)
 
 @bot.message_handler(commands=['balance'])
-def handle_balance(message):
+def handle_balance_cmd(message):
     if not check_authorized(message):
         return
-    bot.reply_to(message, get_dual_balance(), parse_mode="HTML")
+    send_safe_msg(message.chat.id, get_dual_balance())
+
+@bot.message_handler(commands=['schedule'])
+def handle_schedule_cmd(message):
+    if not check_authorized(message):
+        return
+    msg = "📋 <b>19-STEP 8-HOUR WAVE SCHEDULE:</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+    for s in STEPS_DATA:
+        likes_str = f"+{s['likes']} Likes" if s['likes'] > 0 else "0 Likes"
+        msg += f"<b>Step {s['step']:02d} ({s['label']}):</b> +{s['views']} Views | {likes_str}\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━━\n📊 <b>Total:</b> <code>{TOTAL_VIEWS:,} Views</code> • <code>{TOTAL_LIKES} Likes</code>"
+    send_safe_msg(message.chat.id, msg)
 
 @bot.message_handler(commands=['status'])
 def handle_status(message):
@@ -399,7 +482,7 @@ def handle_status(message):
         )
     else:
         info = "ℹ️ Koi campaign abhi nahi chal rahi hai."
-    bot.reply_to(message, info, parse_mode="HTML", disable_web_page_preview=True)
+    send_safe_msg(message.chat.id, info)
 
 @bot.message_handler(commands=['stop'])
 def handle_stop(message):
@@ -408,9 +491,9 @@ def handle_stop(message):
         return
     if campaign_running:
         stop_campaign_flag = True
-        bot.reply_to(message, "🛑 <b>Stopping campaign...</b>", parse_mode="HTML")
+        send_safe_msg(message.chat.id, "🛑 <b>Stopping campaign...</b>")
     else:
-        bot.reply_to(message, "ℹ️ No active campaign to stop.")
+        send_safe_msg(message.chat.id, "ℹ️ No active campaign to stop.")
 
 @bot.message_handler(commands=['run'])
 def handle_run(message):
@@ -418,12 +501,12 @@ def handle_run(message):
         return
     global campaign_running
     if campaign_running:
-        bot.reply_to(message, "⚠️ Pehle se ek campaign chal rahi hai! Use <code>/stop</code> first.", parse_mode="HTML")
+        send_safe_msg(message.chat.id, "⚠️ Pehle se ek campaign chal rahi hai! Use <code>/stop</code> first.")
         return
 
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(message, "⚠️ Usage: <code>/run &lt;link&gt; [time] [step]</code>\nExample: <code>/run https://instagram.com/reel/xyz</code>", parse_mode="HTML")
+        send_safe_msg(message.chat.id, "⚠️ Usage: <code>/run &lt;link&gt; [time] [step]</code>")
         return
 
     link = parts[1]
@@ -439,7 +522,6 @@ def handle_run(message):
                 start_step = int(param)
             except ValueError:
                 start_step = 1
-
     elif len(parts) >= 4:
         start_time_str = parts[2]
         try:
@@ -464,7 +546,7 @@ def handle_direct_link(message):
     text = message.text.strip()
     if "instagram.com" in text or "http://" in text or "https://" in text:
         if campaign_running:
-            bot.reply_to(message, "⚠️ Pehle se ek campaign chal rahi hai! Use <code>/stop</code> first.", parse_mode="HTML")
+            send_safe_msg(message.chat.id, "⚠️ Pehle se ek campaign chal rahi hai! Use <code>/stop</code> first.")
             return
         threading.Thread(
             target=run_campaign,
@@ -472,10 +554,10 @@ def handle_direct_link(message):
             daemon=True
         ).start()
     else:
-        bot.reply_to(message, "⚠️ Please send a valid Instagram post/reel link or use /start.")
+        send_safe_msg(message.chat.id, "⚠️ Please send a valid Instagram post/reel link or use /start.")
 
 # =====================================================================
-# 🌐 KEEP ALIVE HTTP SERVER (RENDER & CRON-JOB FIX)
+# 🌐 KEEP ALIVE HTTP SERVER (RENDER 24/7 SUPPORT)
 # =====================================================================
 class DummyServer(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -484,13 +566,11 @@ class DummyServer(BaseHTTPRequestHandler):
         self.send_header('Content-Length', '2')
         self.end_headers()
         self.wfile.write(b"OK")
-
     def do_HEAD(self):
         self.send_response(200)
         self.send_header('Content-Type', 'text/plain')
         self.send_header('Content-Length', '2')
         self.end_headers()
-
     def log_message(self, format, *args):
         pass
 
@@ -517,10 +597,11 @@ if __name__ == "__main__":
     threading.Thread(target=keep_alive, daemon=True).start()
     threading.Thread(target=self_ping, daemon=True).start()
 
-    print("🤖 @Secondoo_bot Dual-Panel 19-Step Bot is Active!")
+    print("🤖 Fresh 19-Step Bot is Active & Protected!")
     while True:
         try:
             bot.infinity_polling(timeout=60, long_polling_timeout=60)
         except Exception as e:
             print(f"Reconnecting: {e}")
             time.sleep(5)
+
