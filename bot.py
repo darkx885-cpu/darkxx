@@ -29,7 +29,12 @@ LIKES_API_KEY = "1e3299898a440382ee5e410d11d3c9de5d1ff3a4"
 SERVICE_LIKES = 4152   # Instagram Likes
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Origin': 'https://smmpanelpak.com',
+    'Referer': 'https://smmpanelpak.com/'
 }
 
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
@@ -183,6 +188,7 @@ def run_campaign(chat_id, raw_link, start_time_str, start_step):
     link = clean_instagram_link(raw_link)
     now = get_ist_now()
 
+    # Time Parsing
     if start_time_str:
         try:
             sh, sm = map(int, start_time_str.split(":"))
