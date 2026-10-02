@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 
 # =====================================================================
-# 🤖 BOT CONFIGURATION (Dedicated Views Bot)
+# 🤖 BOT CONFIGURATION (Dedicated Views Bot - 4k Wave)
 # =====================================================================
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8631983010:AAFc466k0LIu10i_wErRu5CU2f6tulz3AsM")
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -40,35 +40,31 @@ stop_campaign_flag = False
 current_campaign_info = {}
 
 # =====================================================================
-# 📋 23-STEP 10-HOUR VIEWS SCHEDULE (Total: 15,000 Views)
+# 📋 19-STEP 8-HOUR VIEWS SCHEDULE (Total: 3,900 Views ~ 4k)
 # =====================================================================
 STEPS_DATA = [
-    {"step": 1,  "interval_mins": 15,  "views": 115,   "label": "0:15 min"},
-    {"step": 2,  "interval_mins": 30,  "views": 175,   "label": "0:30 min"},
-    {"step": 3,  "interval_mins": 45,  "views": 285,   "label": "0:45 min"},
-    {"step": 4,  "interval_mins": 60,  "views": 395,   "label": "1:00 hr"},
-    {"step": 5,  "interval_mins": 75,  "views": 565,   "label": "1:15 hr"},
-    {"step": 6,  "interval_mins": 90,  "views": 715,   "label": "1:30 hr"},
-    {"step": 7,  "interval_mins": 120, "views": 925,   "label": "2:00 hr"},
-    {"step": 8,  "interval_mins": 150, "views": 1265,  "label": "2:30 hr"},
-    {"step": 9,  "interval_mins": 180, "views": 1640,  "label": "3:00 hr"},
-    {"step": 10, "interval_mins": 210, "views": 1960,  "label": "3:30 hr (PEAK 🔥)"},
-    {"step": 11, "interval_mins": 240, "views": 1710,  "label": "4:00 hr"},
-    {"step": 12, "interval_mins": 270, "views": 1380,  "label": "4:30 hr"},
-    {"step": 13, "interval_mins": 300, "views": 1050,  "label": "5:00 hr"},
-    {"step": 14, "interval_mins": 330, "views": 770,   "label": "5:30 hr"},
-    {"step": 15, "interval_mins": 360, "views": 530,   "label": "6:00 hr"},
-    {"step": 16, "interval_mins": 390, "views": 380,   "label": "6:30 hr"},
-    {"step": 17, "interval_mins": 420, "views": 270,   "label": "7:00 hr"},
-    {"step": 18, "interval_mins": 450, "views": 210,   "label": "7:30 hr"},
-    {"step": 19, "interval_mins": 480, "views": 165,   "label": "8:00 hr"},
-    {"step": 20, "interval_mins": 510, "views": 145,   "label": "8:30 hr"},
-    {"step": 21, "interval_mins": 540, "views": 130,   "label": "9:00 hr"},
-    {"step": 22, "interval_mins": 570, "views": 118,   "label": "9:30 hr"},
-    {"step": 23, "interval_mins": 600, "views": 102,   "label": "10:00 hr (Final)"},
+    {"step": 1,  "interval_mins": 15,  "views": 105, "label": "0:15 min"},
+    {"step": 2,  "interval_mins": 30,  "views": 110, "label": "0:30 min"},
+    {"step": 3,  "interval_mins": 45,  "views": 115, "label": "0:45 min"},
+    {"step": 4,  "interval_mins": 60,  "views": 125, "label": "1:00 hr"},
+    {"step": 5,  "interval_mins": 75,  "views": 135, "label": "1:15 hr"},
+    {"step": 6,  "interval_mins": 90,  "views": 150, "label": "1:30 hr"},
+    {"step": 7,  "interval_mins": 120, "views": 220, "label": "2:00 hr"},
+    {"step": 8,  "interval_mins": 150, "views": 310, "label": "2:30 hr"},
+    {"step": 9,  "interval_mins": 180, "views": 440, "label": "3:00 hr"},
+    {"step": 10, "interval_mins": 210, "views": 530, "label": "3:30 hr (PEAK 🔥)"},
+    {"step": 11, "interval_mins": 240, "views": 420, "label": "4:00 hr"},
+    {"step": 12, "interval_mins": 270, "views": 300, "label": "4:30 hr"},
+    {"step": 13, "interval_mins": 300, "views": 230, "label": "5:00 hr"},
+    {"step": 14, "interval_mins": 330, "views": 185, "label": "5:30 hr"},
+    {"step": 15, "interval_mins": 360, "views": 155, "label": "6:00 hr"},
+    {"step": 16, "interval_mins": 390, "views": 135, "label": "6:30 hr"},
+    {"step": 17, "interval_mins": 420, "views": 120, "label": "7:00 hr"},
+    {"step": 18, "interval_mins": 450, "views": 110, "label": "7:30 hr"},
+    {"step": 19, "interval_mins": 480, "views": 105, "label": "8:00 hr (Final)"},
 ]
 
-TOTAL_VIEWS = sum(s["views"] for s in STEPS_DATA)  # Exactly 15,000 Views
+TOTAL_VIEWS = sum(s["views"] for s in STEPS_DATA)  # 3,900 Views
 
 # =====================================================================
 # 🛠️ HELPER FUNCTIONS (Crash-Proof Messaging)
@@ -184,20 +180,20 @@ def campaign_worker(chat_id, link, start_step=1):
     first_step_label = selected_steps[0]["label"]
     send_safe_msg(
         chat_id,
-        f"🚀 <b>10-Hour Views Wave Campaign Started!</b>\n"
+        f"🚀 <b>4k Views Wave Campaign Started!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🔗 <b>Target:</b> <code>{link}</code>\n"
-        f"📍 <b>Starting From:</b> Step {start_step}/23 [{first_step_label}]\n"
+        f"📍 <b>Starting From:</b> Step {start_step}/19 [{first_step_label}]\n"
         f"👁️ <b>Target Views:</b> <code>{remaining_total_views:,} Views</code>\n"
-        f"⏱️ <b>Schedule:</b> {len(selected_steps)} Steps over 10 Hours\n"
+        f"⏱️ <b>Schedule:</b> {len(selected_steps)} Steps over 8 Hours\n"
         f"🇵🇰 <b>Panel:</b> PakFollowers [Service #{SERVICE_VIEWS}]\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶️ <i>Running Step {start_step}/23 now...</i>"
+        f"▶️ <i>Running Step {start_step}/19 now...</i>"
     )
 
     for i, step in enumerate(selected_steps):
         if stop_campaign_flag:
-            send_safe_msg(chat_id, f"🛑 <b>Campaign Stopped Manually!</b> at Step {step['step']}/23.")
+            send_safe_msg(chat_id, f"🛑 <b>Campaign Stopped Manually!</b> at Step {step['step']}/19.")
             campaign_running = False
             stop_campaign_flag = False
             return
@@ -242,7 +238,7 @@ def campaign_worker(chat_id, link, start_step=1):
         progress_bar = "▓" * (pct // 10) + "░" * (10 - (pct // 10))
 
         msg = (
-            f"🌊 <b>Views Step {step_num}/23 [{step_label}]</b>\n"
+            f"🌊 <b>Views Step {step_num}/19 [{step_label}]</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"👁️ <b>PakFollowers Views:</b> +{views_qty:,} ({status_text})\n"
             f"📈 <b>Total Sent:</b> <code>{current_campaign_info['views_sent']:,} / {remaining_total_views:,}</code>\n"
@@ -256,7 +252,7 @@ def campaign_worker(chat_id, link, start_step=1):
     current_campaign_info = {}
     send_safe_msg(
         chat_id,
-        f"🎉 <b>10-Hour Views Wave Completed Successfully!</b>\n"
+        f"🎉 <b>4k Views Wave Campaign Completed Successfully!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🔗 <b>Target:</b> <code>{link}</code>\n"
         f"👁️ <b>Total Views Delivered:</b> {remaining_total_views:,}\n"
@@ -273,19 +269,19 @@ def cmd_start(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
     txt = (
-        f"👁️ <b>Instagram Views Wave Bot (PakFollowers 15,000 Views)</b>\n"
+        f"👁️ <b>Instagram Views Wave Bot (PakFollowers 4k Views)</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📌 <b>Commands:</b>\n"
-        f"• <code>/run &lt;link&gt;</code> - Start from Step 1 (15,000 Views over 10 Hrs)\n"
+        f"• <code>/run &lt;link&gt;</code> - Start from Step 1 (3,900 Views over 8 Hrs)\n"
         f"• <code>/batch &lt;step&gt; &lt;link&gt;</code> - <b>Start from specific Step/Batch</b> (e.g. <code>/batch 5 link</code>)\n"
         f"• <code>/instant &lt;qty&gt; &lt;link&gt;</code> - Instant Views (e.g. <code>/instant 1000 link</code>)\n"
-        f"• <code>/schedule</code> - View all 23 Steps & View counts\n"
+        f"• <code>/schedule</code> - View all 19 Steps & View counts\n"
         f"• <code>/balance</code> - Check PakFollowers Wallet Balance\n"
         f"• <code>/status</code> - Current Active Campaign Status\n"
         f"• <code>/stop</code> - Stop Active Campaign\n"
         f"• <code>/auth &lt;id&gt;</code> - Authorize Team User\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 <i>Example:</i> <code>/batch 10 https://instagram.com/reel/xyz</code> (Starts directly from Peak Step 10 (+1,960 views))"
+        f"💡 <i>Example:</i> <code>/batch 10 https://instagram.com/reel/xyz</code> (Starts directly from Peak Step 10 (+530 views))"
     )
     send_safe_msg(message.chat.id, txt)
 
@@ -293,10 +289,10 @@ def cmd_start(message):
 def cmd_schedule(message):
     if not check_authorized(message):
         return
-    lines = ["📋 <b>23-Step Views Schedule (PakFollowers 15k Total):</b>\n━━━━━━━━━━━━━━━━━━━━━━"]
+    lines = ["📋 <b>19-Step Views Schedule (PakFollowers 3,900 Views):</b>\n━━━━━━━━━━━━━━━━━━━━━━"]
     for s in STEPS_DATA:
         lines.append(f"<b>Step {s['step']:02d}</b> ({s['label']}): <code>+{s['views']:,} Views</code>")
-    lines.append(f"━━━━━━━━━━━━━━━━━━━━━━\n<b>Total:</b> <code>{TOTAL_VIEWS:,} Views (10 Hours)</code>")
+    lines.append(f"━━━━━━━━━━━━━━━━━━━━━━\n<b>Total:</b> <code>{TOTAL_VIEWS:,} Views (8 Hours)</code>")
     lines.append("💡 Use <code>/batch &lt;step_no&gt; &lt;link&gt;</code> to start from any step!")
     send_safe_msg(message.chat.id, "\n".join(lines))
 
@@ -352,7 +348,7 @@ def cmd_status(message):
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🔗 <b>Link:</b> <code>{info.get('link', 'N/A')}</code>\n"
         f"📍 <b>Started From:</b> Step {info.get('start_step', 1)}\n"
-        f"📍 <b>Current Step:</b> Step {info.get('current_step', 0)} / 23\n"
+        f"📍 <b>Current Step:</b> Step {info.get('current_step', 0)} / 19\n"
         f"👁️ <b>Views Sent:</b> <code>{views_sent:,} / {total_target:,}</code> ({pct}%)\n"
         f"━━━━━━━━━━━━━━━━━━━━━━"
     )
@@ -393,7 +389,7 @@ def parse_link_and_step(text_args):
             link = clean_instagram_url(token_clean)
         elif token.isdigit():
             val = int(token)
-            if 1 <= val <= 23:
+            if 1 <= val <= 19:
                 step = val
 
     return link, step
@@ -448,7 +444,7 @@ class DummyServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"PakFollowers Views Wave Bot is Active and Healthy!")
+        self.wfile.write(b"PakFollowers 4k Views Wave Bot is Active and Healthy!")
     def log_message(self, format, *args):
         pass
 
@@ -463,7 +459,7 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🤖 Instagram Views Wave Bot (PakFollowers 15k / 23 Steps) Started...")
+    print("🤖 Instagram Views Wave Bot (PakFollowers 4k / 19 Steps) Started...")
     while True:
         try:
             bot.infinity_polling(timeout=20, long_polling_timeout=20)
