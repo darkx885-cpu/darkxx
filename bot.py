@@ -11,17 +11,17 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 
 # =====================================================================
-# 🤖 BOT CONFIGURATION (Dedicated 15k Views Bot)
+# 🤖 BOT CONFIGURATION (Dedicated Views Bot)
 # =====================================================================
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8631983010:AAFc466k0LIu10i_wErRu5CU2f6tulz3AsM")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # =====================================================================
-# 🌐 VIEWS SMM PANEL (YoyoMedia - Fast & Instant)
+# 🌐 VIEWS SMM PANEL (PakFollowers - Service #18999)
 # =====================================================================
-VIEWS_PANEL_URL = "https://yoyomedia.com/api/v2"
-VIEWS_API_KEY = "74d4962ec589605651ecff3c2ab0b9dda47785b2b327303111d0d8920bdd1aed"
-SERVICE_VIEWS = 4322   # ⚡ 4322: [ Fastest Delivery ] Instant [Premium]
+VIEWS_PANEL_URL = "https://pakfollowers.com/api/v2"
+VIEWS_API_KEY = os.environ.get("VIEWS_API_KEY", "889732601d1ae132911f3a68534acef6950a37eb")
+SERVICE_VIEWS = 18999  # Instagram Views fast [100k/h]
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -40,7 +40,7 @@ stop_campaign_flag = False
 current_campaign_info = {}
 
 # =====================================================================
-# 📋 23-STEP 10-HOUR VIEWS SCHEDULE (Total: Exactly 15,000 Views)
+# 📋 23-STEP 10-HOUR VIEWS SCHEDULE (Total: 15,000 Views)
 # =====================================================================
 STEPS_DATA = [
     {"step": 1,  "interval_mins": 15,  "views": 115,   "label": "0:15 min"},
@@ -116,7 +116,7 @@ def get_ist_time_str(dt=None):
     return ist_dt.strftime("%I:%M %p")
 
 # =====================================================================
-# 📡 SMM API FUNCTIONS (YoyoMedia)
+# 📡 SMM API FUNCTIONS (PakFollowers)
 # =====================================================================
 def fetch_balance():
     try:
@@ -124,7 +124,7 @@ def fetch_balance():
         resp = requests.post(VIEWS_PANEL_URL, data=payload, headers=HEADERS, timeout=15)
         data = resp.json()
         bal = data.get("balance", "N/A")
-        cur = data.get("currency", "USD")
+        cur = data.get("currency", "PKR")
         return f"{bal} {cur}"
     except Exception as e:
         return f"Error: {e}"
@@ -190,7 +190,7 @@ def campaign_worker(chat_id, link, start_step=1):
         f"📍 <b>Starting From:</b> Step {start_step}/23 [{first_step_label}]\n"
         f"👁️ <b>Target Views:</b> <code>{remaining_total_views:,} Views</code>\n"
         f"⏱️ <b>Schedule:</b> {len(selected_steps)} Steps over 10 Hours\n"
-        f"⚡ <b>Panel:</b> YoyoMedia [Service #{SERVICE_VIEWS}]\n"
+        f"🇵🇰 <b>Panel:</b> PakFollowers [Service #{SERVICE_VIEWS}]\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"▶️ <i>Running Step {start_step}/23 now...</i>"
     )
@@ -244,7 +244,7 @@ def campaign_worker(chat_id, link, start_step=1):
         msg = (
             f"🌊 <b>Views Step {step_num}/23 [{step_label}]</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👁️ <b>Views Ordered:</b> +{views_qty:,} ({status_text})\n"
+            f"👁️ <b>PakFollowers Views:</b> +{views_qty:,} ({status_text})\n"
             f"📈 <b>Total Sent:</b> <code>{current_campaign_info['views_sent']:,} / {remaining_total_views:,}</code>\n"
             f"📊 <b>Progress:</b> [{progress_bar}] {pct}%\n"
             f"🕒 <b>Time:</b> {exec_time_str} IST\n"
@@ -273,14 +273,14 @@ def cmd_start(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
     txt = (
-        f"👁️ <b>Instagram Views Wave Bot (15,000 Views)</b>\n"
+        f"👁️ <b>Instagram Views Wave Bot (PakFollowers 15,000 Views)</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📌 <b>Commands:</b>\n"
         f"• <code>/run &lt;link&gt;</code> - Start from Step 1 (15,000 Views over 10 Hrs)\n"
         f"• <code>/batch &lt;step&gt; &lt;link&gt;</code> - <b>Start from specific Step/Batch</b> (e.g. <code>/batch 5 link</code>)\n"
         f"• <code>/instant &lt;qty&gt; &lt;link&gt;</code> - Instant Views (e.g. <code>/instant 1000 link</code>)\n"
         f"• <code>/schedule</code> - View all 23 Steps & View counts\n"
-        f"• <code>/balance</code> - Check YoyoMedia Wallet Balance\n"
+        f"• <code>/balance</code> - Check PakFollowers Wallet Balance\n"
         f"• <code>/status</code> - Current Active Campaign Status\n"
         f"• <code>/stop</code> - Stop Active Campaign\n"
         f"• <code>/auth &lt;id&gt;</code> - Authorize Team User\n"
@@ -293,7 +293,7 @@ def cmd_start(message):
 def cmd_schedule(message):
     if not check_authorized(message):
         return
-    lines = ["📋 <b>23-Step Views Schedule (15,000 Views Total):</b>\n━━━━━━━━━━━━━━━━━━━━━━"]
+    lines = ["📋 <b>23-Step Views Schedule (PakFollowers 15k Total):</b>\n━━━━━━━━━━━━━━━━━━━━━━"]
     for s in STEPS_DATA:
         lines.append(f"<b>Step {s['step']:02d}</b> ({s['label']}): <code>+{s['views']:,} Views</code>")
     lines.append(f"━━━━━━━━━━━━━━━━━━━━━━\n<b>Total:</b> <code>{TOTAL_VIEWS:,} Views (10 Hours)</code>")
@@ -308,7 +308,7 @@ def cmd_balance(message):
     txt = (
         f"💰 <b>Views Panel Balance:</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡ <b>YoyoMedia:</b> <code>{bal}</code>\n"
+        f"🇵🇰 <b>PakFollowers:</b> <code>{bal}</code>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━"
     )
     send_safe_msg(message.chat.id, txt)
@@ -448,7 +448,7 @@ class DummyServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"Views Wave Bot is Active and Healthy!")
+        self.wfile.write(b"PakFollowers Views Wave Bot is Active and Healthy!")
     def log_message(self, format, *args):
         pass
 
@@ -463,7 +463,7 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🤖 Instagram Views Wave Bot (15k Views / 23 Steps) Started...")
+    print("🤖 Instagram Views Wave Bot (PakFollowers 15k / 23 Steps) Started...")
     while True:
         try:
             bot.infinity_polling(timeout=20, long_polling_timeout=20)
