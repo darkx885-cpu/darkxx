@@ -1,84 +1,80 @@
 import telebot
+from telebot import types
 import requests
 import time
 import threading
 import os
-import html
+import json
 import socketserver
-import urllib.request
 from urllib.parse import urlparse
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 
 # =====================================================================
-# 🤖 BOT CONFIGURATION (Dedicated Views Bot - 4k Wave)
+# 🤖 BOT CONFIGURATION
 # =====================================================================
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8631983010:AAFc466k0LIu10i_wErRu5CU2f6tulz3AsM")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8966472325:AAHNDkup2W4Zo6ja_70eSiEI7zdPq-PF5mw")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # =====================================================================
-# 🌐 VIEWS SMM PANEL (PakFollowers - Service #18999)
+# 🌐 YOYOMEDIA SMM PANEL CONFIGURATION (ONLY DRIP-FEED)
 # =====================================================================
-VIEWS_PANEL_URL = "https://pakfollowers.com/api/v2"
-VIEWS_API_KEY = os.environ.get("VIEWS_API_KEY", "889732601d1ae132911f3a68534acef6950a37eb")
-SERVICE_VIEWS = 18999  # Instagram Views fast [100k/h]
+YOYO_PANEL_URL = "https://yoyomedia.com/api/v2"
+YOYO_API_KEY = os.environ.get("YOYO_API_KEY", "cef0c6f45b80971e384b69f61608ab4a9e76ff52d7e14a3954ef19f44ea300d1")
+YOYO_SERVICE_VIEWS = 3508  # Instagram Reel/Video Views [Best Views] [Non Drop]
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Accept': '*/*',
-    'Content-Type': 'application/x-www-form-urlencoded'
+    'Content-Type': 'application/x-www-form-urlencoded',
 }
+
+# =====================================================================
+# 🌊 DRIP-FEED SETTINGS (Default: 1k Views, 8 Runs, 45m Gap, 18m Delay)
+# =====================================================================
+CONFIG_FILE = "drip_config.json"
+
+def load_drip_config():
+    default_config = {
+        "total_views": 1000,
+        "runs": 8,
+        "interval": 45,        # Har 45 minute me ek run
+        "initial_delay": 18    # Link paste karne ke theek 18 min baad start
+    }
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return default_config
+
+def save_drip_config(cfg):
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as e:
+        print(f"Error saving config: {e}")
+
+drip_config = load_drip_config()
 
 # =====================================================================
 # 👥 ADMIN & AUTHORIZATION
 # =====================================================================
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
-ALLOWED_USERS = [8207879798]  # Pre-authorized team user
+ALLOWED_USERS = [8207879798]
 
-campaign_running = False
-stop_campaign_flag = False
-current_campaign_info = {}
-
-# =====================================================================
-# 📋 19-STEP 8-HOUR VIEWS SCHEDULE (Total: 3,900 Views ~ 4k)
-# =====================================================================
-STEPS_DATA = [
-    {"step": 1,  "interval_mins": 15,  "views": 105, "label": "0:15 min"},
-    {"step": 2,  "interval_mins": 30,  "views": 110, "label": "0:30 min"},
-    {"step": 3,  "interval_mins": 45,  "views": 115, "label": "0:45 min"},
-    {"step": 4,  "interval_mins": 60,  "views": 125, "label": "1:00 hr"},
-    {"step": 5,  "interval_mins": 75,  "views": 135, "label": "1:15 hr"},
-    {"step": 6,  "interval_mins": 90,  "views": 150, "label": "1:30 hr"},
-    {"step": 7,  "interval_mins": 120, "views": 220, "label": "2:00 hr"},
-    {"step": 8,  "interval_mins": 150, "views": 310, "label": "2:30 hr"},
-    {"step": 9,  "interval_mins": 180, "views": 440, "label": "3:00 hr"},
-    {"step": 10, "interval_mins": 210, "views": 530, "label": "3:30 hr (PEAK 🔥)"},
-    {"step": 11, "interval_mins": 240, "views": 420, "label": "4:00 hr"},
-    {"step": 12, "interval_mins": 270, "views": 300, "label": "4:30 hr"},
-    {"step": 13, "interval_mins": 300, "views": 230, "label": "5:00 hr"},
-    {"step": 14, "interval_mins": 330, "views": 185, "label": "5:30 hr"},
-    {"step": 15, "interval_mins": 360, "views": 155, "label": "6:00 hr"},
-    {"step": 16, "interval_mins": 390, "views": 135, "label": "6:30 hr"},
-    {"step": 17, "interval_mins": 420, "views": 120, "label": "7:00 hr"},
-    {"step": 18, "interval_mins": 450, "views": 110, "label": "7:30 hr"},
-    {"step": 19, "interval_mins": 480, "views": 105, "label": "8:00 hr (Final)"},
-]
-
-TOTAL_VIEWS = sum(s["views"] for s in STEPS_DATA)  # 3,900 Views
+# Active timer threads tracking: {chat_id: {"cancel": bool, "skip": bool}}
+active_timers = {}
 
 # =====================================================================
-# 🛠️ HELPER FUNCTIONS (Crash-Proof Messaging)
+# 🛠️ HELPER FUNCTIONS
 # =====================================================================
-def send_safe_msg(chat_id, text, disable_web_page_preview=True):
-    """Safely sends HTML message; falls back to plain text if parse error occurs."""
+def send_safe_msg(chat_id, text, disable_web_page_preview=True, reply_markup=None):
     try:
-        return bot.send_message(chat_id, text, parse_mode="HTML", disable_web_page_preview=disable_web_page_preview)
+        return bot.send_message(chat_id, text, parse_mode="HTML", disable_web_page_preview=disable_web_page_preview, reply_markup=reply_markup)
     except Exception:
         clean_text = text.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "").replace("<i>", "").replace("</i>", "")
-        try:
-            return bot.send_message(chat_id, clean_text, parse_mode=None, disable_web_page_preview=disable_web_page_preview)
-        except Exception as e:
-            print(f"Error sending message: {e}")
+        return bot.send_message(chat_id, clean_text, parse_mode=None, disable_web_page_preview=disable_web_page_preview, reply_markup=reply_markup)
 
 def check_authorized(message):
     global ADMIN_ID, ALLOWED_USERS
@@ -91,7 +87,7 @@ def check_authorized(message):
     return user_id == ADMIN_ID or user_id in ALLOWED_USERS
 
 def clean_instagram_url(raw_url):
-    raw_url = raw_url.strip().strip("<>").strip()
+    raw_url = raw_url.strip()
     if not raw_url.startswith("http://") and not raw_url.startswith("https://"):
         raw_url = "https://" + raw_url
     try:
@@ -101,7 +97,7 @@ def clean_instagram_url(raw_url):
             parts = path.strip("/").split("/")
             if len(parts) >= 2:
                 return f"https://www.instagram.com/{parts[0]}/{parts[1]}/"
-        return f"{parsed.scheme}://{parsed.netloc}{path}"
+        return f"https://www.instagram.com{path}" if not path.endswith("/") else f"https://www.instagram.com{path}"
     except Exception:
         return raw_url
 
@@ -112,156 +108,177 @@ def get_ist_time_str(dt=None):
     return ist_dt.strftime("%I:%M %p")
 
 # =====================================================================
-# 📡 SMM API FUNCTIONS (PakFollowers)
+# 📡 YOYOMEDIA API FUNCTIONS
 # =====================================================================
 def fetch_balance():
     try:
-        payload = {"key": VIEWS_API_KEY, "action": "balance"}
-        resp = requests.post(VIEWS_PANEL_URL, data=payload, headers=HEADERS, timeout=15)
+        resp = requests.post(YOYO_PANEL_URL, data={"key": YOYO_API_KEY, "action": "balance"}, headers=HEADERS, timeout=12)
         data = resp.json()
-        bal = data.get("balance", "N/A")
-        cur = data.get("currency", "PKR")
-        return f"{bal} {cur}"
+        return f"{data.get('balance', 'N/A')} {data.get('currency', 'USD')}"
     except Exception as e:
-        return f"Error: {e}"
+        return f"Error ({e})"
 
-def place_views_order(link, quantity, max_retries=3):
-    payload = {
-        "key": VIEWS_API_KEY,
-        "action": "add",
-        "service": SERVICE_VIEWS,
-        "link": link,
-        "quantity": quantity
-    }
-    last_err = "Unknown error"
-    for attempt in range(1, max_retries + 1):
-        try:
-            resp = requests.post(VIEWS_PANEL_URL, data=payload, headers=HEADERS, timeout=15)
-            data = resp.json()
-            if "order" in data:
-                return True, data["order"]
-            elif "error" in data:
-                last_err = data["error"]
-            else:
-                last_err = str(data)
-        except Exception as e:
-            last_err = str(e)
-        if attempt < max_retries:
-            time.sleep(2)
-    return False, last_err
+def place_yoyo_dripfeed_order(link, quantity, runs, interval):
+    try:
+        payload = {
+            "key": YOYO_API_KEY,
+            "action": "add",
+            "service": YOYO_SERVICE_VIEWS,
+            "link": link,
+            "quantity": quantity,
+            "runs": runs,
+            "interval": interval
+        }
+        resp = requests.post(YOYO_PANEL_URL, data=payload, headers=HEADERS, timeout=15)
+        data = resp.json()
+        if "order" in data:
+            return True, data["order"]
+        elif "error" in data:
+            return False, data["error"]
+        return False, str(data)
+    except Exception as e:
+        return False, str(e)
 
 # =====================================================================
-# 🌊 VIEWS CAMPAIGN RUNNER (Supports Starting from any Batch/Step)
+# ⏳ 18-MINUTE DELAY WORKER & ORDER TRIGGER
 # =====================================================================
-def campaign_worker(chat_id, link, start_step=1):
-    global campaign_running, stop_campaign_flag, current_campaign_info
+def execute_order_now(chat_id, link):
+    t_views = drip_config["total_views"]
+    r_runs = drip_config["runs"]
+    i_interval = drip_config["interval"]
+    qty_per_run = max(100, t_views // r_runs)
+    actual_total = qty_per_run * r_runs
+    total_hours = (r_runs * i_interval) / 60
 
-    # Filter steps from start_step onwards
-    selected_steps = [s for s in STEPS_DATA if s["step"] >= start_step]
-    if not selected_steps:
-        selected_steps = STEPS_DATA
-        start_step = 1
+    send_safe_msg(chat_id, f"⏳ Placing <b>{actual_total} Views Drip-Feed</b> on YoyoMedia...")
+    success, order_res = place_yoyo_dripfeed_order(link, qty_per_run, r_runs, i_interval)
 
-    # Base minutes offset so start_step executes immediately
-    base_mins_offset = selected_steps[0]["interval_mins"]
-    remaining_total_views = sum(s["views"] for s in selected_steps)
-
-    start_utc = datetime.now(timezone.utc)
-    current_campaign_info = {
-        "link": link,
-        "start_time": start_utc,
-        "start_step": start_step,
-        "current_step": start_step,
-        "views_sent": 0,
-        "total_views_target": remaining_total_views,
-        "chat_id": chat_id
-    }
-
-    first_step_label = selected_steps[0]["label"]
-    send_safe_msg(
-        chat_id,
-        f"🚀 <b>4k Views Wave Campaign Started!</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔗 <b>Target:</b> <code>{link}</code>\n"
-        f"📍 <b>Starting From:</b> Step {start_step}/19 [{first_step_label}]\n"
-        f"👁️ <b>Target Views:</b> <code>{remaining_total_views:,} Views</code>\n"
-        f"⏱️ <b>Schedule:</b> {len(selected_steps)} Steps over 8 Hours\n"
-        f"🇵🇰 <b>Panel:</b> PakFollowers [Service #{SERVICE_VIEWS}]\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"▶️ <i>Running Step {start_step}/19 now...</i>"
-    )
-
-    for i, step in enumerate(selected_steps):
-        if stop_campaign_flag:
-            send_safe_msg(chat_id, f"🛑 <b>Campaign Stopped Manually!</b> at Step {step['step']}/19.")
-            campaign_running = False
-            stop_campaign_flag = False
-            return
-
-        step_num = step["step"]
-        step_original_mins = step["interval_mins"]
-        views_qty = step["views"]
-        step_label = step["label"]
-        current_campaign_info["current_step"] = step_num
-
-        # First executed step runs immediately without waiting
-        if i == 0:
-            sleep_seconds = 0
-        else:
-            relative_mins = step_original_mins - base_mins_offset
-            target_time_utc = start_utc + timedelta(minutes=relative_mins)
-            now_utc = datetime.now(timezone.utc)
-            sleep_seconds = (target_time_utc - now_utc).total_seconds()
-
-        while sleep_seconds > 0:
-            if stop_campaign_flag:
-                send_safe_msg(chat_id, f"🛑 <b>Campaign Stopped Manually!</b> before Step {step_num}.")
-                campaign_running = False
-                stop_campaign_flag = False
-                return
-            chunk = min(sleep_seconds, 5)
-            time.sleep(chunk)
-            now_utc = datetime.now(timezone.utc)
-            sleep_seconds = (target_time_utc - now_utc).total_seconds()
-
-        # Place Views Order
-        success, order_res = place_views_order(link, views_qty)
-        exec_time_str = get_ist_time_str()
-
-        if success:
-            current_campaign_info["views_sent"] += views_qty
-            status_text = f"✅ Order #{order_res}"
-        else:
-            status_text = f"❌ Failed ({order_res})"
-
-        pct = int((current_campaign_info["views_sent"] / remaining_total_views) * 100) if remaining_total_views > 0 else 100
-        progress_bar = "▓" * (pct // 10) + "░" * (10 - (pct // 10))
-
-        msg = (
-            f"🌊 <b>Views Step {step_num}/19 [{step_label}]</b>\n"
+    if success:
+        txt = (
+            f"🎉 <b>Drip-Feed Order Successful!</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👁️ <b>PakFollowers Views:</b> +{views_qty:,} ({status_text})\n"
-            f"📈 <b>Total Sent:</b> <code>{current_campaign_info['views_sent']:,} / {remaining_total_views:,}</code>\n"
-            f"📊 <b>Progress:</b> [{progress_bar}] {pct}%\n"
-            f"🕒 <b>Time:</b> {exec_time_str} IST\n"
+            f"🆔 <b>Order ID:</b> <code>#{order_res}</code>\n"
+            f"🔗 <b>Reel:</b> <code>{link}</code>\n"
+            f"👁️ <b>Total Views:</b> <code>{actual_total} Views</code>\n"
+            f"🔁 <b>Runs:</b> <code>{r_runs} runs</code> ({qty_per_run} views/run)\n"
+            f"⏱️ <b>Interval:</b> Har <code>{i_interval} minute</code> me\n"
+            f"⌛ <b>Duration:</b> ~{total_hours:.1f} Hours Wave\n"
+            f"🛡️ <b>Bot Score Protection:</b> Active (Safe S-Curve)\n"
             f"━━━━━━━━━━━━━━━━━━━━━━"
         )
-        send_safe_msg(chat_id, msg)
+        send_safe_msg(chat_id, txt)
+    else:
+        send_safe_msg(chat_id, f"❌ <b>Drip-Feed Order Failed:</b>\n<code>{order_res}</code>")
 
-    campaign_running = False
-    current_campaign_info = {}
+def delay_timer_worker(chat_id, link, delay_mins):
+    active_timers[chat_id] = {"cancel": False, "skip": False}
+    seconds = delay_mins * 60
+
+    while seconds > 0:
+        if active_timers.get(chat_id, {}).get("cancel", False):
+            send_safe_msg(chat_id, "🛑 <b>Order Cancelled!</b> Timer stop ho gaya hai.")
+            del active_timers[chat_id]
+            return
+        if active_timers.get(chat_id, {}).get("skip", False):
+            break
+        chunk = min(seconds, 3)
+        time.sleep(chunk)
+        seconds -= chunk
+
+    if active_timers.get(chat_id, {}).get("cancel", False):
+        del active_timers[chat_id]
+        return
+
+    # Trigger now!
     send_safe_msg(
         chat_id,
-        f"🎉 <b>4k Views Wave Campaign Completed Successfully!</b>\n"
+        f"🚨🚨 <b>{delay_mins} MINUTE HO GAYE HAIN!</b> 🚨🚨\n"
+        f"Abhi YoyoMedia par Drip-Feed order lag raha hai... 🚀"
+    )
+    execute_order_now(chat_id, link)
+    if chat_id in active_timers:
+        del active_timers[chat_id]
+
+def start_drip_pipeline(chat_id, raw_url):
+    clean_url = clean_instagram_url(raw_url)
+    delay_mins = drip_config.get("initial_delay", 18)
+    t_views = drip_config["total_views"]
+    r_runs = drip_config["runs"]
+    i_interval = drip_config["interval"]
+
+    target_utc = datetime.now(timezone.utc) + timedelta(minutes=delay_mins)
+    target_ist = get_ist_time_str(target_utc)
+
+    # Cancel previous timer if running
+    if chat_id in active_timers:
+        active_timers[chat_id]["cancel"] = True
+        time.sleep(1)
+
+    th = threading.Thread(target=delay_timer_worker, args=(chat_id, clean_url, delay_mins), daemon=True)
+    th.start()
+
+    # Clean inline controls
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btn_skip = types.InlineKeyboardButton("⚡ Skip (Abhi Lagao)", callback_data=f"skip|{clean_url}")
+    btn_cancel = types.InlineKeyboardButton("❌ Cancel Order", callback_data=f"cancel|{clean_url}")
+    markup.add(btn_skip, btn_cancel)
+
+    msg_txt = (
+        f"🎯 <b>Instagram Reel Link Received!</b>\n"
+        f"<code>{clean_url}</code>\n\n"
+        f"⏳ <b>{delay_mins}-Minute Delay Timer Shuru!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔗 <b>Target:</b> <code>{link}</code>\n"
-        f"👁️ <b>Total Views Delivered:</b> {remaining_total_views:,}\n"
-        f"🕒 <b>Finished At:</b> {get_ist_time_str()} IST\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━"
+        f"🕒 <b>Order Execution Time:</b> <b>{target_ist} IST</b> (Theek {delay_mins} min baad)\n"
+        f"🌊 <b>Drip Plan:</b> {t_views} Views ({r_runs} runs x {i_interval}m interval)\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"😴 <i>Aap aaram karein! Theek {delay_mins} minute baad bot khud YoyoMedia par order lagayega aur phone par alert bhejega! 🔔</i>"
+    )
+    send_safe_msg(chat_id, msg_txt, reply_markup=markup)
+
+# =====================================================================
+# ⚙️ SETTINGS MENU
+# =====================================================================
+def get_settings_markup():
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    btn_d15 = types.InlineKeyboardButton("⏱️ Delay: 15m", callback_data="cfg_delay_15")
+    btn_d18 = types.InlineKeyboardButton("⏱️ Delay: 18m", callback_data="cfg_delay_18")
+    btn_d20 = types.InlineKeyboardButton("⏱️ Delay: 20m", callback_data="cfg_delay_20")
+
+    btn_i30 = types.InlineKeyboardButton("🔄 Gap: 30m", callback_data="cfg_interval_30")
+    btn_i45 = types.InlineKeyboardButton("🔄 Gap: 45m", callback_data="cfg_interval_45")
+    btn_i60 = types.InlineKeyboardButton("🔄 Gap: 60m", callback_data="cfg_interval_60")
+    
+    btn_r5 = types.InlineKeyboardButton("🔁 5 Runs", callback_data="cfg_runs_5")
+    btn_r8 = types.InlineKeyboardButton("🔁 8 Runs", callback_data="cfg_runs_8")
+    btn_r10 = types.InlineKeyboardButton("🔁 10 Runs", callback_data="cfg_runs_10")
+
+    markup.row(btn_d15, btn_d18, btn_d20)
+    markup.row(btn_i30, btn_i45, btn_i60)
+    markup.row(btn_r5, btn_r8, btn_r10)
+    return markup
+
+def format_settings_text():
+    t = drip_config["total_views"]
+    r = drip_config["runs"]
+    i = drip_config["interval"]
+    d = drip_config.get("initial_delay", 18)
+    per_run = t // r
+    hours = (r * i) / 60
+    return (
+        f"⚙️ <b>Drip-Feed Live Settings:</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏳ <b>Initial Delay:</b> <code>{d} minutes</code> (Link aane ke {d} min baad order)\n"
+        f"👁️ <b>Total Views:</b> <code>{t} Views</code>\n"
+        f"🔁 <b>Number of Runs:</b> <code>{r} runs</code>\n"
+        f"⏱️ <b>Interval (Runs Gap):</b> <code>{i} minutes</code>\n"
+        f"📦 <b>Views per run:</b> <code>{per_run} views</code>\n"
+        f"⌛ <b>Total Campaign Duration:</b> <code>~{hours:.1f} Hours</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Neeche buttons par tap karke kisi bhi waqt badal sakte hain:</i>"
     )
 
 # =====================================================================
-# 💬 TELEGRAM BOT COMMANDS
+# 💬 TELEGRAM COMMANDS
 # =====================================================================
 @bot.message_handler(commands=['start', 'help'])
 def cmd_start(message):
@@ -269,101 +286,43 @@ def cmd_start(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
     txt = (
-        f"👁️ <b>Instagram Views Wave Bot (PakFollowers 4k Views)</b>\n"
+        f"🌊 <b>Instagram Drip-Feed Automation Bot</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ <b>Ye Bot Kaise Kaam Karta Hai?</b>\n"
+        f"1. Instagram par reel post karein.\n"
+        f"2. <b>Seedha Reel ka link yahan bhej dein!</b>\n"
+        f"3. Bot theek <b>18 minute ka timer</b> start karega aur 18 min baad <b>YoyoMedia par Drip-Feed Order (#3508)</b> khud laga dega!\n\n"
         f"📌 <b>Commands:</b>\n"
-        f"• <code>/run &lt;link&gt;</code> - Start from Step 1 (3,900 Views over 8 Hrs)\n"
-        f"• <code>/batch &lt;step&gt; &lt;link&gt;</code> - <b>Start from specific Step/Batch</b> (e.g. <code>/batch 5 link</code>)\n"
-        f"• <code>/instant &lt;qty&gt; &lt;link&gt;</code> - Instant Views (e.g. <code>/instant 1000 link</code>)\n"
-        f"• <code>/schedule</code> - View all 19 Steps & View counts\n"
-        f"• <code>/balance</code> - Check PakFollowers Wallet Balance\n"
-        f"• <code>/status</code> - Current Active Campaign Status\n"
-        f"• <code>/stop</code> - Stop Active Campaign\n"
-        f"• <code>/auth &lt;id&gt;</code> - Authorize Team User\n"
+        f"• <code>/settings</code> - Delay & Interval change karein\n"
+        f"• <code>/balance</code> - YoyoMedia wallet balance\n"
+        f"• <code>/stop</code> - Active timer cancel karein\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 <i>Example:</i> <code>/batch 10 https://instagram.com/reel/xyz</code> (Starts directly from Peak Step 10 (+530 views))"
+        f"💡 <i>Bas Instagram Reel ka link paste karo, baaki kaam bot karega!</i>"
     )
     send_safe_msg(message.chat.id, txt)
 
-@bot.message_handler(commands=['schedule'])
-def cmd_schedule(message):
+@bot.message_handler(commands=['settings', 'config'])
+def cmd_settings(message):
     if not check_authorized(message):
         return
-    lines = ["📋 <b>19-Step Views Schedule (PakFollowers 3,900 Views):</b>\n━━━━━━━━━━━━━━━━━━━━━━"]
-    for s in STEPS_DATA:
-        lines.append(f"<b>Step {s['step']:02d}</b> ({s['label']}): <code>+{s['views']:,} Views</code>")
-    lines.append(f"━━━━━━━━━━━━━━━━━━━━━━\n<b>Total:</b> <code>{TOTAL_VIEWS:,} Views (8 Hours)</code>")
-    lines.append("💡 Use <code>/batch &lt;step_no&gt; &lt;link&gt;</code> to start from any step!")
-    send_safe_msg(message.chat.id, "\n".join(lines))
+    send_safe_msg(message.chat.id, format_settings_text(), reply_markup=get_settings_markup())
 
 @bot.message_handler(commands=['balance'])
 def cmd_balance(message):
     if not check_authorized(message):
         return
     bal = fetch_balance()
-    txt = (
-        f"💰 <b>Views Panel Balance:</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🇵🇰 <b>PakFollowers:</b> <code>{bal}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━"
-    )
-    send_safe_msg(message.chat.id, txt)
+    send_safe_msg(message.chat.id, f"💰 <b>YoyoMedia Wallet Balance:</b> <code>{bal}</code>")
 
-@bot.message_handler(commands=['instant'])
-def cmd_instant(message):
-    if not check_authorized(message):
-        return
-    parts = message.text.split(maxsplit=2)
-    if len(parts) < 3:
-        send_safe_msg(message.chat.id, "⚠️ Usage: <code>/instant &lt;quantity&gt; &lt;instagram_link&gt;</code>\nExample: <code>/instant 1000 https://instagram.com/reel/xyz</code>")
-        return
-    try:
-        qty = int(parts[1])
-        if qty < 100:
-            send_safe_msg(message.chat.id, "⚠️ Minimum quantity for Instant Views is 100.")
-            return
-        link = clean_instagram_url(parts[2].strip())
-        send_safe_msg(message.chat.id, f"⏳ Placing Instant Order for <b>{qty:,} Views</b> on <code>{link}</code>...")
-        success, res = place_views_order(link, qty)
-        if success:
-            send_safe_msg(message.chat.id, f"✅ <b>Order Placed Successfully!</b>\n🆔 Order ID: <code>#{res}</code>\n👁️ Quantity: <code>{qty:,} Views</code>")
-        else:
-            send_safe_msg(message.chat.id, f"❌ <b>Order Failed:</b> {res}")
-    except ValueError:
-        send_safe_msg(message.chat.id, "⚠️ Quantity must be a valid number.")
-
-@bot.message_handler(commands=['status'])
-def cmd_status(message):
-    if not check_authorized(message):
-        return
-    if not campaign_running:
-        send_safe_msg(message.chat.id, "ℹ️ No Views campaign is currently running.")
-        return
-    info = current_campaign_info
-    total_target = info.get('total_views_target', TOTAL_VIEWS)
-    views_sent = info.get('views_sent', 0)
-    pct = int((views_sent / total_target) * 100) if total_target > 0 else 100
-    txt = (
-        f"📊 <b>Views Campaign Status:</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔗 <b>Link:</b> <code>{info.get('link', 'N/A')}</code>\n"
-        f"📍 <b>Started From:</b> Step {info.get('start_step', 1)}\n"
-        f"📍 <b>Current Step:</b> Step {info.get('current_step', 0)} / 19\n"
-        f"👁️ <b>Views Sent:</b> <code>{views_sent:,} / {total_target:,}</code> ({pct}%)\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━"
-    )
-    send_safe_msg(message.chat.id, txt)
-
-@bot.message_handler(commands=['stop'])
+@bot.message_handler(commands=['stop', 'cancel'])
 def cmd_stop(message):
-    global stop_campaign_flag
     if not check_authorized(message):
         return
-    if not campaign_running:
-        send_safe_msg(message.chat.id, "ℹ️ No campaign is running.")
-        return
-    stop_campaign_flag = True
-    send_safe_msg(message.chat.id, "⏳ Stopping Views campaign...")
+    if message.chat.id in active_timers:
+        active_timers[message.chat.id]["cancel"] = True
+        send_safe_msg(message.chat.id, "🛑 Active timer cancel kar diya gaya hai.")
+    else:
+        send_safe_msg(message.chat.id, "ℹ️ Koi active timer nahi chal raha hai.")
 
 @bot.message_handler(commands=['auth'])
 def cmd_auth(message):
@@ -377,64 +336,62 @@ def cmd_auth(message):
     except Exception:
         send_safe_msg(message.chat.id, "⚠️ Usage: <code>/auth &lt;user_id&gt;</code>")
 
-# Parse link and step from command arguments
-def parse_link_and_step(text_args):
-    tokens = text_args.split()
-    link = None
-    step = 1
-
-    for token in tokens:
-        token_clean = token.strip("<>")
-        if "instagram.com" in token_clean or "http://" in token_clean or "https://" in token_clean:
-            link = clean_instagram_url(token_clean)
-        elif token.isdigit():
-            val = int(token)
-            if 1 <= val <= 19:
-                step = val
-
-    return link, step
-
-@bot.message_handler(commands=['run', 'batch'])
-def cmd_run_or_batch(message):
-    if not check_authorized(message):
-        return
-    args = message.text.split(maxsplit=1)
-    if len(args) < 2:
-        send_safe_msg(
-            message.chat.id,
-            "⚠️ <b>Usage:</b>\n"
-            "• <code>/run &lt;link&gt;</code> (Starts from Step 1)\n"
-            "• <code>/batch &lt;step_no&gt; &lt;link&gt;</code> (e.g. <code>/batch 5 https://instagram.com/reel/xyz</code>)"
-        )
-        return
-
-    link, step = parse_link_and_step(args[1])
-    if not link:
-        send_safe_msg(message.chat.id, "⚠️ Valid Instagram link nahi mila!\nExample: <code>/batch 5 https://instagram.com/reel/xyz</code>")
-        return
-
-    start_views_campaign(message.chat.id, link, start_step=step)
-
+# =====================================================================
+# 🔗 DIRECT INSTAGRAM LINK HANDLER (100% AUTOMATIC)
+# =====================================================================
 @bot.message_handler(func=lambda msg: True)
 def handle_all_messages(message):
     if not check_authorized(message):
         return
-    text = message.text.strip().strip("<>")
-    if "instagram.com" in text or "http://" in text or "https://" in text:
-        link, step = parse_link_and_step(text)
-        start_views_campaign(message.chat.id, link, start_step=step)
+    text = message.text.strip()
+    if "instagram.com" in text:
+        start_drip_pipeline(message.chat.id, text)
     else:
-        send_safe_msg(message.chat.id, "❓ Unknown command. Send an Instagram link or type /help.")
+        send_safe_msg(message.chat.id, "❓ Unknown message. Kripya Instagram Reel ka link paste karein ya /help type karein.")
 
-def start_views_campaign(chat_id, link, start_step=1):
-    global campaign_running, stop_campaign_flag
-    if campaign_running:
-        send_safe_msg(chat_id, "⚠️ A Views campaign is already running! Use /stop first.")
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callbacks(call):
+    chat_id = call.message.chat.id
+    data = call.data
+
+    bot.answer_callback_query(call.id)
+
+    # 1. Config updates
+    if data.startswith("cfg_"):
+        parts = data.split("_")
+        key = parts[1]
+        val = int(parts[2])
+        if key == "interval":
+            drip_config["interval"] = val
+        elif key == "runs":
+            drip_config["runs"] = val
+        elif key == "delay":
+            drip_config["initial_delay"] = val
+        save_drip_config(drip_config)
+
+        try:
+            bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                text=f"✅ <b>Setting Updated!</b>\n\n{format_settings_text()}",
+                parse_mode="HTML",
+                reply_markup=get_settings_markup()
+            )
+        except Exception:
+            send_safe_msg(chat_id, f"✅ <b>Setting Updated!</b>\n\n{format_settings_text()}", reply_markup=get_settings_markup())
         return
-    campaign_running = True
-    stop_campaign_flag = False
-    th = threading.Thread(target=campaign_worker, args=(chat_id, link, start_step), daemon=True)
-    th.start()
+
+    # 2. Skip or Cancel
+    if data.startswith("skip|"):
+        link = data.split("|", maxsplit=1)[1]
+        if chat_id in active_timers:
+            active_timers[chat_id]["skip"] = True
+        else:
+            execute_order_now(chat_id, link)
+    elif data.startswith("cancel|"):
+        if chat_id in active_timers:
+            active_timers[chat_id]["cancel"] = True
+            send_safe_msg(chat_id, "🛑 Order cancelled.")
 
 # =====================================================================
 # 🌐 KEEP-ALIVE DUMMY HTTP SERVER (For Render Free Web Service)
@@ -444,14 +401,17 @@ class DummyServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"PakFollowers 4k Views Wave Bot is Active and Healthy!")
+        self.wfile.write(b"Drip-Feed Bot is Active and Healthy!")
     def log_message(self, format, *args):
         pass
 
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8080))
-    with socketserver.TCPServer(("", port), DummyServer) as httpd:
-        httpd.serve_forever()
+    try:
+        with socketserver.TCPServer(("", port), DummyServer) as httpd:
+            httpd.serve_forever()
+    except Exception as e:
+        print(f"Server error on port {port}: {e}")
 
 # =====================================================================
 # 🚀 MAIN ENTRY POINT
@@ -459,7 +419,7 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🤖 Instagram Views Wave Bot (PakFollowers 4k / 19 Steps) Started...")
+    print("🌊 Pure Instagram Drip-Feed Bot Started...")
     while True:
         try:
             bot.infinity_polling(timeout=20, long_polling_timeout=20)
