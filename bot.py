@@ -29,7 +29,7 @@ HEADERS = {
 }
 
 # =====================================================================
-# 🌊 DRIP-FEED SETTINGS (Default: 1k Views, 8 Runs, 45m Gap, 18m Delay)
+# 🌊 DRIP-FEED SETTINGS (Default: 16-Minute Run Time & Delay)
 # =====================================================================
 CONFIG_FILE = "drip_config.json"
 
@@ -37,8 +37,8 @@ def load_drip_config():
     default_config = {
         "total_views": 1000,
         "runs": 8,
-        "interval": 45,        # Har 45 minute me ek run
-        "initial_delay": 18    # Link paste karne ke theek 18 min baad start
+        "interval": 16,        # Har 16 minute me ek run (Panel Interval)
+        "initial_delay": 16    # Link paste karne ke theek 16 min baad start
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -140,7 +140,7 @@ def place_yoyo_dripfeed_order(link, quantity, runs, interval):
         return False, str(e)
 
 # =====================================================================
-# ⏳ 18-MINUTE DELAY WORKER & ORDER TRIGGER
+# ⏳ 16-MINUTE DELAY WORKER & ORDER TRIGGER
 # =====================================================================
 def execute_order_now(chat_id, link):
     t_views = drip_config["total_views"]
@@ -189,7 +189,6 @@ def delay_timer_worker(chat_id, link, delay_mins):
         del active_timers[chat_id]
         return
 
-    # Trigger now!
     send_safe_msg(
         chat_id,
         f"🚨🚨 <b>{delay_mins} MINUTE HO GAYE HAIN!</b> 🚨🚨\n"
@@ -201,7 +200,7 @@ def delay_timer_worker(chat_id, link, delay_mins):
 
 def start_drip_pipeline(chat_id, raw_url):
     clean_url = clean_instagram_url(raw_url)
-    delay_mins = drip_config.get("initial_delay", 18)
+    delay_mins = drip_config.get("initial_delay", 16)
     t_views = drip_config["total_views"]
     r_runs = drip_config["runs"]
     i_interval = drip_config["interval"]
@@ -209,7 +208,6 @@ def start_drip_pipeline(chat_id, raw_url):
     target_utc = datetime.now(timezone.utc) + timedelta(minutes=delay_mins)
     target_ist = get_ist_time_str(target_utc)
 
-    # Cancel previous timer if running
     if chat_id in active_timers:
         active_timers[chat_id]["cancel"] = True
         time.sleep(1)
@@ -217,7 +215,6 @@ def start_drip_pipeline(chat_id, raw_url):
     th = threading.Thread(target=delay_timer_worker, args=(chat_id, clean_url, delay_mins), daemon=True)
     th.start()
 
-    # Clean inline controls
     markup = types.InlineKeyboardMarkup(row_width=2)
     btn_skip = types.InlineKeyboardButton("⚡ Skip (Abhi Lagao)", callback_data=f"skip|{clean_url}")
     btn_cancel = types.InlineKeyboardButton("❌ Cancel Order", callback_data=f"cancel|{clean_url}")
@@ -241,19 +238,19 @@ def start_drip_pipeline(chat_id, raw_url):
 def get_settings_markup():
     markup = types.InlineKeyboardMarkup(row_width=3)
     btn_d15 = types.InlineKeyboardButton("⏱️ Delay: 15m", callback_data="cfg_delay_15")
+    btn_d16 = types.InlineKeyboardButton("⏱️ Delay: 16m", callback_data="cfg_delay_16")
     btn_d18 = types.InlineKeyboardButton("⏱️ Delay: 18m", callback_data="cfg_delay_18")
-    btn_d20 = types.InlineKeyboardButton("⏱️ Delay: 20m", callback_data="cfg_delay_20")
 
+    btn_i16 = types.InlineKeyboardButton("🔄 Gap: 16m", callback_data="cfg_interval_16")
     btn_i30 = types.InlineKeyboardButton("🔄 Gap: 30m", callback_data="cfg_interval_30")
     btn_i45 = types.InlineKeyboardButton("🔄 Gap: 45m", callback_data="cfg_interval_45")
-    btn_i60 = types.InlineKeyboardButton("🔄 Gap: 60m", callback_data="cfg_interval_60")
     
     btn_r5 = types.InlineKeyboardButton("🔁 5 Runs", callback_data="cfg_runs_5")
     btn_r8 = types.InlineKeyboardButton("🔁 8 Runs", callback_data="cfg_runs_8")
     btn_r10 = types.InlineKeyboardButton("🔁 10 Runs", callback_data="cfg_runs_10")
 
-    markup.row(btn_d15, btn_d18, btn_d20)
-    markup.row(btn_i30, btn_i45, btn_i60)
+    markup.row(btn_d15, btn_d16, btn_d18)
+    markup.row(btn_i16, btn_i30, btn_i45)
     markup.row(btn_r5, btn_r8, btn_r10)
     return markup
 
@@ -261,7 +258,7 @@ def format_settings_text():
     t = drip_config["total_views"]
     r = drip_config["runs"]
     i = drip_config["interval"]
-    d = drip_config.get("initial_delay", 18)
+    d = drip_config.get("initial_delay", 16)
     per_run = t // r
     hours = (r * i) / 60
     return (
@@ -285,13 +282,14 @@ def cmd_start(message):
     if not check_authorized(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
+    d = drip_config.get("initial_delay", 16)
     txt = (
         f"🌊 <b>Instagram Drip-Feed Automation Bot</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⚡ <b>Ye Bot Kaise Kaam Karta Hai?</b>\n"
         f"1. Instagram par reel post karein.\n"
         f"2. <b>Seedha Reel ka link yahan bhej dein!</b>\n"
-        f"3. Bot theek <b>18 minute ka timer</b> start karega aur 18 min baad <b>YoyoMedia par Drip-Feed Order (#3508)</b> khud laga dega!\n\n"
+        f"3. Bot theek <b>{d} minute ka timer</b> start karega aur {d} min baad <b>YoyoMedia par Drip-Feed Order (#3508)</b> khud laga dega!\n\n"
         f"📌 <b>Commands:</b>\n"
         f"• <code>/settings</code> - Delay & Interval change karein\n"
         f"• <code>/balance</code> - YoyoMedia wallet balance\n"
@@ -356,7 +354,6 @@ def handle_callbacks(call):
 
     bot.answer_callback_query(call.id)
 
-    # 1. Config updates
     if data.startswith("cfg_"):
         parts = data.split("_")
         key = parts[1]
@@ -381,7 +378,6 @@ def handle_callbacks(call):
             send_safe_msg(chat_id, f"✅ <b>Setting Updated!</b>\n\n{format_settings_text()}", reply_markup=get_settings_markup())
         return
 
-    # 2. Skip or Cancel
     if data.startswith("skip|"):
         link = data.split("|", maxsplit=1)[1]
         if chat_id in active_timers:
@@ -419,10 +415,11 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🌊 Pure Instagram Drip-Feed Bot Started...")
+    print("🌊 Pure Instagram Drip-Feed Bot Started (16 Min Default)...")
     while True:
         try:
             bot.infinity_polling(timeout=20, long_polling_timeout=20)
         except Exception as e:
             print(f"Polling error: {e}")
             time.sleep(3)
+            
