@@ -29,14 +29,14 @@ HEADERS = {
 }
 
 # =====================================================================
-# 🌊 DRIP-FEED SETTINGS (Default: 16-Minute Run Time & Delay)
+# 🌊 DRIP-FEED SETTINGS (Default: 16 Runs, 16m Interval, 16m Delay)
 # =====================================================================
 CONFIG_FILE = "drip_config.json"
 
 def load_drip_config():
     default_config = {
-        "total_views": 1000,
-        "runs": 8,
+        "total_views": 1600,
+        "runs": 16,            # 16 Runs
         "interval": 16,        # Har 16 minute me ek run (Panel Interval)
         "initial_delay": 16    # Link paste karne ke theek 16 min baad start
     }
@@ -63,7 +63,6 @@ drip_config = load_drip_config()
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 ALLOWED_USERS = [8207879798]
 
-# Active timer threads tracking: {chat_id: {"cancel": bool, "skip": bool}}
 active_timers = {}
 
 # =====================================================================
@@ -163,7 +162,7 @@ def execute_order_now(chat_id, link):
             f"🔁 <b>Runs:</b> <code>{r_runs} runs</code> ({qty_per_run} views/run)\n"
             f"⏱️ <b>Interval:</b> Har <code>{i_interval} minute</code> me\n"
             f"⌛ <b>Duration:</b> ~{total_hours:.1f} Hours Wave\n"
-            f"🛡️ <b>Bot Score Protection:</b> Active (Safe S-Curve)\n"
+            f"🛡️ <b>Bot Score Protection:</b> Active (Ultra Safe S-Curve)\n"
             f"━━━━━━━━━━━━━━━━━━━━━━"
         )
         send_safe_msg(chat_id, txt)
@@ -204,6 +203,8 @@ def start_drip_pipeline(chat_id, raw_url):
     t_views = drip_config["total_views"]
     r_runs = drip_config["runs"]
     i_interval = drip_config["interval"]
+    qty_per_run = max(100, t_views // r_runs)
+    actual_total = qty_per_run * r_runs
 
     target_utc = datetime.now(timezone.utc) + timedelta(minutes=delay_mins)
     target_ist = get_ist_time_str(target_utc)
@@ -226,7 +227,8 @@ def start_drip_pipeline(chat_id, raw_url):
         f"⏳ <b>{delay_mins}-Minute Delay Timer Shuru!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🕒 <b>Order Execution Time:</b> <b>{target_ist} IST</b> (Theek {delay_mins} min baad)\n"
-        f"🌊 <b>Drip Plan:</b> {t_views} Views ({r_runs} runs x {i_interval}m interval)\n"
+        f"🌊 <b>Drip Plan:</b> {actual_total} Views ({r_runs} runs x {i_interval}m interval)\n"
+        f"📦 <b>Per Run:</b> {qty_per_run} views/run\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"😴 <i>Aap aaram karein! Theek {delay_mins} minute baad bot khud YoyoMedia par order lagayega aur phone par alert bhejega! 🔔</i>"
     )
@@ -245,13 +247,13 @@ def get_settings_markup():
     btn_i30 = types.InlineKeyboardButton("🔄 Gap: 30m", callback_data="cfg_interval_30")
     btn_i45 = types.InlineKeyboardButton("🔄 Gap: 45m", callback_data="cfg_interval_45")
     
-    btn_r5 = types.InlineKeyboardButton("🔁 5 Runs", callback_data="cfg_runs_5")
     btn_r8 = types.InlineKeyboardButton("🔁 8 Runs", callback_data="cfg_runs_8")
     btn_r10 = types.InlineKeyboardButton("🔁 10 Runs", callback_data="cfg_runs_10")
+    btn_r16 = types.InlineKeyboardButton("🔁 16 Runs 🔥", callback_data="cfg_runs_16")
 
     markup.row(btn_d15, btn_d16, btn_d18)
     markup.row(btn_i16, btn_i30, btn_i45)
-    markup.row(btn_r5, btn_r8, btn_r10)
+    markup.row(btn_r8, btn_r10, btn_r16)
     return markup
 
 def format_settings_text():
@@ -259,16 +261,17 @@ def format_settings_text():
     r = drip_config["runs"]
     i = drip_config["interval"]
     d = drip_config.get("initial_delay", 16)
-    per_run = t // r
+    per_run = max(100, t // r)
+    actual_total = per_run * r
     hours = (r * i) / 60
     return (
         f"⚙️ <b>Drip-Feed Live Settings:</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⏳ <b>Initial Delay:</b> <code>{d} minutes</code> (Link aane ke {d} min baad order)\n"
-        f"👁️ <b>Total Views:</b> <code>{t} Views</code>\n"
+        f"⏳ <b>Initial Delay:</b> <code>{d} minutes</code> (Link aane ke {d} min baad)\n"
         f"🔁 <b>Number of Runs:</b> <code>{r} runs</code>\n"
         f"⏱️ <b>Interval (Runs Gap):</b> <code>{i} minutes</code>\n"
-        f"📦 <b>Views per run:</b> <code>{per_run} views</code>\n"
+        f"📦 <b>Views per run:</b> <code>{per_run} views</code> (Panel Min = 100)\n"
+        f"👁️ <b>Total Views:</b> <code>{actual_total} Views</code>\n"
         f"⌛ <b>Total Campaign Duration:</b> <code>~{hours:.1f} Hours</code>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"<i>Neeche buttons par tap karke kisi bhi waqt badal sakte hain:</i>"
@@ -283,13 +286,16 @@ def cmd_start(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
     d = drip_config.get("initial_delay", 16)
+    r = drip_config.get("runs", 16)
+    i = drip_config.get("interval", 16)
     txt = (
         f"🌊 <b>Instagram Drip-Feed Automation Bot</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⚡ <b>Ye Bot Kaise Kaam Karta Hai?</b>\n"
         f"1. Instagram par reel post karein.\n"
         f"2. <b>Seedha Reel ka link yahan bhej dein!</b>\n"
-        f"3. Bot theek <b>{d} minute ka timer</b> start karega aur {d} min baad <b>YoyoMedia par Drip-Feed Order (#3508)</b> khud laga dega!\n\n"
+        f"3. Bot theek <b>{d} minute ka timer</b> chalayega aur {d} min baad <b>YoyoMedia par Drip-Feed Order (#3508)</b> khud laga dega!\n\n"
+        f"⚙️ <b>Active Setup:</b> {r} Runs | Har {i} Min me | 100 Views per run\n\n"
         f"📌 <b>Commands:</b>\n"
         f"• <code>/settings</code> - Delay & Interval change karein\n"
         f"• <code>/balance</code> - YoyoMedia wallet balance\n"
@@ -415,11 +421,10 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🌊 Pure Instagram Drip-Feed Bot Started (16 Min Default)...")
+    print("🌊 Pure Instagram Drip-Feed Bot Started (16 Runs / 16 Min Interval)...")
     while True:
         try:
             bot.infinity_polling(timeout=20, long_polling_timeout=20)
         except Exception as e:
             print(f"Polling error: {e}")
             time.sleep(3)
-            
