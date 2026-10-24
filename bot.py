@@ -29,21 +29,24 @@ HEADERS = {
 }
 
 # =====================================================================
-# 🌊 DRIP-FEED SETTINGS (Default: 16 Runs, 16m Interval, 16m Delay)
+# 🌊 DRIP-FEED SETTINGS (125 Views Per Run | 16 Min Interval | 16 Min Delay)
 # =====================================================================
 CONFIG_FILE = "drip_config.json"
 
 def load_drip_config():
     default_config = {
-        "total_views": 1600,
-        "runs": 16,            # 16 Runs
+        "qty_per_run": 125,    # Har run me theek 125 views
+        "runs": 8,             # 8 Runs (8 x 125 = 1,000 Views)
         "interval": 16,        # Har 16 minute me ek run (Panel Interval)
         "initial_delay": 16    # Link paste karne ke theek 16 min baad start
     }
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r") as f:
-                return json.load(f)
+                cfg = json.load(f)
+                if "qty_per_run" not in cfg:
+                    cfg["qty_per_run"] = 125
+                return cfg
         except Exception:
             pass
     return default_config
@@ -142,10 +145,9 @@ def place_yoyo_dripfeed_order(link, quantity, runs, interval):
 # ⏳ 16-MINUTE DELAY WORKER & ORDER TRIGGER
 # =====================================================================
 def execute_order_now(chat_id, link):
-    t_views = drip_config["total_views"]
+    qty_per_run = drip_config.get("qty_per_run", 125)
     r_runs = drip_config["runs"]
     i_interval = drip_config["interval"]
-    qty_per_run = max(100, t_views // r_runs)
     actual_total = qty_per_run * r_runs
     total_hours = (r_runs * i_interval) / 60
 
@@ -162,7 +164,7 @@ def execute_order_now(chat_id, link):
             f"🔁 <b>Runs:</b> <code>{r_runs} runs</code> ({qty_per_run} views/run)\n"
             f"⏱️ <b>Interval:</b> Har <code>{i_interval} minute</code> me\n"
             f"⌛ <b>Duration:</b> ~{total_hours:.1f} Hours Wave\n"
-            f"🛡️ <b>Bot Score Protection:</b> Active (Ultra Safe S-Curve)\n"
+            f"🛡️ <b>Bot Score Protection:</b> Active (Safe S-Curve)\n"
             f"━━━━━━━━━━━━━━━━━━━━━━"
         )
         send_safe_msg(chat_id, txt)
@@ -200,10 +202,9 @@ def delay_timer_worker(chat_id, link, delay_mins):
 def start_drip_pipeline(chat_id, raw_url):
     clean_url = clean_instagram_url(raw_url)
     delay_mins = drip_config.get("initial_delay", 16)
-    t_views = drip_config["total_views"]
+    qty_per_run = drip_config.get("qty_per_run", 125)
     r_runs = drip_config["runs"]
     i_interval = drip_config["interval"]
-    qty_per_run = max(100, t_views // r_runs)
     actual_total = qty_per_run * r_runs
 
     target_utc = datetime.now(timezone.utc) + timedelta(minutes=delay_mins)
@@ -228,7 +229,7 @@ def start_drip_pipeline(chat_id, raw_url):
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🕒 <b>Order Execution Time:</b> <b>{target_ist} IST</b> (Theek {delay_mins} min baad)\n"
         f"🌊 <b>Drip Plan:</b> {actual_total} Views ({r_runs} runs x {i_interval}m interval)\n"
-        f"📦 <b>Per Run:</b> {qty_per_run} views/run\n"
+        f"📦 <b>Per Run:</b> <b>{qty_per_run} views/run</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"😴 <i>Aap aaram karein! Theek {delay_mins} minute baad bot khud YoyoMedia par order lagayega aur phone par alert bhejega! 🔔</i>"
     )
@@ -247,30 +248,29 @@ def get_settings_markup():
     btn_i30 = types.InlineKeyboardButton("🔄 Gap: 30m", callback_data="cfg_interval_30")
     btn_i45 = types.InlineKeyboardButton("🔄 Gap: 45m", callback_data="cfg_interval_45")
     
-    btn_r8 = types.InlineKeyboardButton("🔁 8 Runs", callback_data="cfg_runs_8")
-    btn_r10 = types.InlineKeyboardButton("🔁 10 Runs", callback_data="cfg_runs_10")
-    btn_r16 = types.InlineKeyboardButton("🔁 16 Runs 🔥", callback_data="cfg_runs_16")
+    btn_r8 = types.InlineKeyboardButton("🔁 8 Runs (1k Views)", callback_data="cfg_runs_8")
+    btn_r12 = types.InlineKeyboardButton("🔁 12 Runs (1.5k)", callback_data="cfg_runs_12")
+    btn_r16 = types.InlineKeyboardButton("🔁 16 Runs (2k)", callback_data="cfg_runs_16")
 
     markup.row(btn_d15, btn_d16, btn_d18)
     markup.row(btn_i16, btn_i30, btn_i45)
-    markup.row(btn_r8, btn_r10, btn_r16)
+    markup.row(btn_r8, btn_r12, btn_r16)
     return markup
 
 def format_settings_text():
-    t = drip_config["total_views"]
+    qty = drip_config.get("qty_per_run", 125)
     r = drip_config["runs"]
     i = drip_config["interval"]
     d = drip_config.get("initial_delay", 16)
-    per_run = max(100, t // r)
-    actual_total = per_run * r
+    actual_total = qty * r
     hours = (r * i) / 60
     return (
         f"⚙️ <b>Drip-Feed Live Settings:</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⏳ <b>Initial Delay:</b> <code>{d} minutes</code> (Link aane ke {d} min baad)\n"
+        f"📦 <b>Views per run:</b> <code>{qty} views</code>\n"
         f"🔁 <b>Number of Runs:</b> <code>{r} runs</code>\n"
         f"⏱️ <b>Interval (Runs Gap):</b> <code>{i} minutes</code>\n"
-        f"📦 <b>Views per run:</b> <code>{per_run} views</code> (Panel Min = 100)\n"
         f"👁️ <b>Total Views:</b> <code>{actual_total} Views</code>\n"
         f"⌛ <b>Total Campaign Duration:</b> <code>~{hours:.1f} Hours</code>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -286,8 +286,10 @@ def cmd_start(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
     d = drip_config.get("initial_delay", 16)
-    r = drip_config.get("runs", 16)
+    r = drip_config.get("runs", 8)
     i = drip_config.get("interval", 16)
+    q = drip_config.get("qty_per_run", 125)
+    tot = q * r
     txt = (
         f"🌊 <b>Instagram Drip-Feed Automation Bot</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -295,9 +297,13 @@ def cmd_start(message):
         f"1. Instagram par reel post karein.\n"
         f"2. <b>Seedha Reel ka link yahan bhej dein!</b>\n"
         f"3. Bot theek <b>{d} minute ka timer</b> chalayega aur {d} min baad <b>YoyoMedia par Drip-Feed Order (#3508)</b> khud laga dega!\n\n"
-        f"⚙️ <b>Active Setup:</b> {r} Runs | Har {i} Min me | 100 Views per run\n\n"
+        f"⚙️ <b>Active Setup:</b>\n"
+        f"• Per Run Views: <b>{q} Views</b>\n"
+        f"• Number of Runs: <b>{r} Runs</b>\n"
+        f"• Interval: Har <b>{i} Minute</b> me\n"
+        f"• Total Views: <b>{tot} Views</b>\n\n"
         f"📌 <b>Commands:</b>\n"
-        f"• <code>/settings</code> - Delay & Interval change karein\n"
+        f"• <code>/settings</code> - Runs, Delay & Interval change karein\n"
         f"• <code>/balance</code> - YoyoMedia wallet balance\n"
         f"• <code>/stop</code> - Active timer cancel karein\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -421,7 +427,7 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🌊 Pure Instagram Drip-Feed Bot Started (16 Runs / 16 Min Interval)...")
+    print("🌊 Pure Instagram Drip-Feed Bot Started (125 Views / 16 Min Interval)...")
     while True:
         try:
             bot.infinity_polling(timeout=20, long_polling_timeout=20)
