@@ -11,17 +11,23 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 
 # =====================================================================
-# 🤖 BOT CONFIGURATION
+# 🤖 TELEGRAM BOT CONFIGURATION
 # =====================================================================
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8966472325:AAHNDkup2W4Zo6ja_70eSiEI7zdPq-PF5mw")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # =====================================================================
-# 🌐 YOYOMEDIA SMM PANEL CONFIGURATION (ONLY DRIP-FEED)
+# 🌐 XMEDIASMM PANEL CONFIGURATION (TIKTOK SERVICE 1364)
 # =====================================================================
-YOYO_PANEL_URL = "https://yoyomedia.com/api/v2"
-YOYO_API_KEY = os.environ.get("YOYO_API_KEY", "cef0c6f45b80971e384b69f61608ab4a9e76ff52d7e14a3954ef19f44ea300d1")
-YOYO_SERVICE_VIEWS = 3508  # Instagram Reel/Video Views [Best Views] [Non Drop]
+PANEL_URL = "https://xmediasmm.in/api/v2"
+API_KEY = os.environ.get("XMEDIA_API_KEY", "31b2e3bd9cc353a811ae37d72d56586a")
+SERVICE_ID = 1364  # Tiktok Views [No Refill] [Instant Start] - Rs 0.70 / 1000
+
+# ⚙️ EXACT SETTINGS (Fixed as requested)
+QTY_PER_RUN = 125    # 125 views per order
+TOTAL_RUNS = 16      # 16 runs
+INTERVAL_MINS = 45   # Har 45 minute me agla order
+TOTAL_VIEWS = QTY_PER_RUN * TOTAL_RUNS  # 2,000 Views Total
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -29,44 +35,14 @@ HEADERS = {
 }
 
 # =====================================================================
-# 🌊 DRIP-FEED SETTINGS (125 Views Per Run | 16 Min Interval | 16 Min Delay)
-# =====================================================================
-CONFIG_FILE = "drip_config.json"
-
-def load_drip_config():
-    default_config = {
-        "qty_per_run": 125,    # Har run me theek 125 views
-        "runs": 8,             # 8 Runs (8 x 125 = 1,000 Views)
-        "interval": 16,        # Har 16 minute me ek run (Panel Interval)
-        "initial_delay": 16    # Link paste karne ke theek 16 min baad start
-    }
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                cfg = json.load(f)
-                if "qty_per_run" not in cfg:
-                    cfg["qty_per_run"] = 125
-                return cfg
-        except Exception:
-            pass
-    return default_config
-
-def save_drip_config(cfg):
-    try:
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(cfg, f, indent=2)
-    except Exception as e:
-        print(f"Error saving config: {e}")
-
-drip_config = load_drip_config()
-
-# =====================================================================
-# 👥 ADMIN & AUTHORIZATION
+# 👥 ADMIN & STATE TRACKING
 # =====================================================================
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 ALLOWED_USERS = [8207879798]
 
-active_timers = {}
+campaign_running = False
+stop_campaign_flag = False
+current_campaign_info = {}
 
 # =====================================================================
 # 🛠️ HELPER FUNCTIONS
@@ -88,20 +64,11 @@ def check_authorized(message):
         return True
     return user_id == ADMIN_ID or user_id in ALLOWED_USERS
 
-def clean_instagram_url(raw_url):
+def clean_url(raw_url):
     raw_url = raw_url.strip()
     if not raw_url.startswith("http://") and not raw_url.startswith("https://"):
         raw_url = "https://" + raw_url
-    try:
-        parsed = urlparse(raw_url)
-        path = parsed.path
-        if "/reel/" in path or "/p/" in path or "/tv/" in path:
-            parts = path.strip("/").split("/")
-            if len(parts) >= 2:
-                return f"https://www.instagram.com/{parts[0]}/{parts[1]}/"
-        return f"https://www.instagram.com{path}" if not path.endswith("/") else f"https://www.instagram.com{path}"
-    except Exception:
-        return raw_url
+    return raw_url
 
 def get_ist_time_str(dt=None):
     if dt is None:
@@ -110,28 +77,26 @@ def get_ist_time_str(dt=None):
     return ist_dt.strftime("%I:%M %p")
 
 # =====================================================================
-# 📡 YOYOMEDIA API FUNCTIONS
+# 📡 SMM API FUNCTIONS
 # =====================================================================
 def fetch_balance():
     try:
-        resp = requests.post(YOYO_PANEL_URL, data={"key": YOYO_API_KEY, "action": "balance"}, headers=HEADERS, timeout=12)
+        resp = requests.post(PANEL_URL, data={"key": API_KEY, "action": "balance"}, headers=HEADERS, timeout=12)
         data = resp.json()
-        return f"{data.get('balance', 'N/A')} {data.get('currency', 'USD')}"
+        return f"{data.get('balance', 'N/A')} {data.get('currency', 'INR')}"
     except Exception as e:
         return f"Error ({e})"
 
-def place_yoyo_dripfeed_order(link, quantity, runs, interval):
+def place_order(link, quantity):
     try:
         payload = {
-            "key": YOYO_API_KEY,
+            "key": API_KEY,
             "action": "add",
-            "service": YOYO_SERVICE_VIEWS,
+            "service": SERVICE_ID,
             "link": link,
-            "quantity": quantity,
-            "runs": runs,
-            "interval": interval
+            "quantity": quantity
         }
-        resp = requests.post(YOYO_PANEL_URL, data=payload, headers=HEADERS, timeout=15)
+        resp = requests.post(PANEL_URL, data=payload, headers=HEADERS, timeout=15)
         data = resp.json()
         if "order" in data:
             return True, data["order"]
@@ -142,140 +107,114 @@ def place_yoyo_dripfeed_order(link, quantity, runs, interval):
         return False, str(e)
 
 # =====================================================================
-# ⏳ 16-MINUTE DELAY WORKER & ORDER TRIGGER
+# 🌊 TIKTOK DRIP-FEED ENGINE (Link paste karte hi start)
 # =====================================================================
-def execute_order_now(chat_id, link):
-    qty_per_run = drip_config.get("qty_per_run", 125)
-    r_runs = drip_config["runs"]
-    i_interval = drip_config["interval"]
-    actual_total = qty_per_run * r_runs
-    total_hours = (r_runs * i_interval) / 60
+def drip_campaign_worker(chat_id, link):
+    global campaign_running, stop_campaign_flag, current_campaign_info
 
-    send_safe_msg(chat_id, f"⏳ Placing <b>{actual_total} Views Drip-Feed</b> on YoyoMedia...")
-    success, order_res = place_yoyo_dripfeed_order(link, qty_per_run, r_runs, i_interval)
+    start_utc = datetime.now(timezone.utc)
+    total_hours = (TOTAL_RUNS * INTERVAL_MINS) / 60
 
-    if success:
-        txt = (
-            f"🎉 <b>Drip-Feed Order Successful!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🆔 <b>Order ID:</b> <code>#{order_res}</code>\n"
-            f"🔗 <b>Reel:</b> <code>{link}</code>\n"
-            f"👁️ <b>Total Views:</b> <code>{actual_total} Views</code>\n"
-            f"🔁 <b>Runs:</b> <code>{r_runs} runs</code> ({qty_per_run} views/run)\n"
-            f"⏱️ <b>Interval:</b> Har <code>{i_interval} minute</code> me\n"
-            f"⌛ <b>Duration:</b> ~{total_hours:.1f} Hours Wave\n"
-            f"🛡️ <b>Bot Score Protection:</b> Active (Safe S-Curve)\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        send_safe_msg(chat_id, txt)
-    else:
-        send_safe_msg(chat_id, f"❌ <b>Drip-Feed Order Failed:</b>\n<code>{order_res}</code>")
-
-def delay_timer_worker(chat_id, link, delay_mins):
-    active_timers[chat_id] = {"cancel": False, "skip": False}
-    seconds = delay_mins * 60
-
-    while seconds > 0:
-        if active_timers.get(chat_id, {}).get("cancel", False):
-            send_safe_msg(chat_id, "🛑 <b>Order Cancelled!</b> Timer stop ho gaya hai.")
-            del active_timers[chat_id]
-            return
-        if active_timers.get(chat_id, {}).get("skip", False):
-            break
-        chunk = min(seconds, 3)
-        time.sleep(chunk)
-        seconds -= chunk
-
-    if active_timers.get(chat_id, {}).get("cancel", False):
-        del active_timers[chat_id]
-        return
+    current_campaign_info = {
+        "link": link,
+        "start_time": start_utc,
+        "current_run": 0,
+        "views_sent": 0,
+        "chat_id": chat_id,
+        "next_run_ist": get_ist_time_str()
+    }
 
     send_safe_msg(
         chat_id,
-        f"🚨🚨 <b>{delay_mins} MINUTE HO GAYE HAIN!</b> 🚨🚨\n"
-        f"Abhi YoyoMedia par Drip-Feed order lag raha hai... 🚀"
+        f"🚀 <b>TikTok Drip-Feed Campaign Started!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔗 <b>Target:</b> <code>{link}</code>\n"
+        f"👁️ <b>Total Target:</b> <code>{TOTAL_VIEWS} Views</code>\n"
+        f"🔁 <b>Structure:</b> <code>{TOTAL_RUNS} Runs</code> (125 views/run)\n"
+        f"⏱️ <b>Interval:</b> Har <code>{INTERVAL_MINS} minute</code> me\n"
+        f"⌛ <b>Duration:</b> ~{total_hours:.1f} Hours Wave\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"▶️ <i>Run 1/16 abhi turant place ho raha hai...</i>"
     )
-    execute_order_now(chat_id, link)
-    if chat_id in active_timers:
-        del active_timers[chat_id]
 
-def start_drip_pipeline(chat_id, raw_url):
-    clean_url = clean_instagram_url(raw_url)
-    delay_mins = drip_config.get("initial_delay", 16)
-    qty_per_run = drip_config.get("qty_per_run", 125)
-    r_runs = drip_config["runs"]
-    i_interval = drip_config["interval"]
-    actual_total = qty_per_run * r_runs
+    for run_idx in range(1, TOTAL_RUNS + 1):
+        if stop_campaign_flag:
+            send_safe_msg(chat_id, f"🛑 <b>Campaign Stopped Manually!</b> at Run {run_idx - 1}/{TOTAL_RUNS}.")
+            campaign_running = False
+            stop_campaign_flag = False
+            return
 
-    target_utc = datetime.now(timezone.utc) + timedelta(minutes=delay_mins)
-    target_ist = get_ist_time_str(target_utc)
+        current_campaign_info["current_run"] = run_idx
+        exec_time_str = get_ist_time_str()
 
-    if chat_id in active_timers:
-        active_timers[chat_id]["cancel"] = True
-        time.sleep(1)
+        # Place Order for this Run (125 views)
+        success, order_res = place_order(link, QTY_PER_RUN)
 
-    th = threading.Thread(target=delay_timer_worker, args=(chat_id, clean_url, delay_mins), daemon=True)
+        if success:
+            current_campaign_info["views_sent"] += QTY_PER_RUN
+            status_text = f"✅ Order #{order_res}"
+        else:
+            status_text = f"❌ Failed ({order_res})"
+
+        pct = int((current_campaign_info["views_sent"] / TOTAL_VIEWS) * 100)
+        progress_bar = "▓" * (pct // 10) + "░" * (10 - (pct // 10))
+
+        # Calculate next run time
+        if run_idx < TOTAL_RUNS:
+            next_time_utc = datetime.now(timezone.utc) + timedelta(minutes=INTERVAL_MINS)
+            next_str = get_ist_time_str(next_time_utc)
+            current_campaign_info["next_run_ist"] = next_str
+            next_info = f"🕒 <b>Next Run ({run_idx + 1}/{TOTAL_RUNS}):</b> At <b>{next_str} IST</b> (in {INTERVAL_MINS}m)"
+        else:
+            next_info = "🏁 <b>Final Run Completed!</b>"
+
+        msg = (
+            f"🌊 <b>TikTok Drip Run {run_idx}/{TOTAL_RUNS}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📦 <b>Views Ordered:</b> +{QTY_PER_RUN} ({status_text})\n"
+            f"📈 <b>Total Sent:</b> <code>{current_campaign_info['views_sent']} / {TOTAL_VIEWS} Views</code>\n"
+            f"📊 <b>Progress:</b> [{progress_bar}] {pct}%\n"
+            f"🕒 <b>Time:</b> {exec_time_str} IST\n"
+            f"{next_info}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━"
+        )
+        send_safe_msg(chat_id, msg)
+
+        # Wait 45 minutes for next run
+        if run_idx < TOTAL_RUNS:
+            sleep_seconds = INTERVAL_MINS * 60
+            while sleep_seconds > 0:
+                if stop_campaign_flag:
+                    send_safe_msg(chat_id, f"🛑 <b>Campaign Stopped Manually!</b> during Run {run_idx} cooldown.")
+                    campaign_running = False
+                    stop_campaign_flag = False
+                    return
+                chunk = min(sleep_seconds, 5)
+                time.sleep(chunk)
+                sleep_seconds -= chunk
+
+    campaign_running = False
+    current_campaign_info = {}
+    send_safe_msg(
+        chat_id,
+        f"🎉 <b>TikTok 16-Run Drip Campaign Finished!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔗 <b>Target:</b> <code>{link}</code>\n"
+        f"👁️ <b>Total Views Delivered:</b> {TOTAL_VIEWS}\n"
+        f"🕒 <b>Finished At:</b> {get_ist_time_str()} IST\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+def start_campaign(chat_id, raw_url):
+    global campaign_running, stop_campaign_flag
+    if campaign_running:
+        send_safe_msg(chat_id, "⚠️ Ek TikTok Drip Campaign pehle se chal raha hai! Naya shuru karne ke liye pehle /stop karein.")
+        return
+    c_url = clean_url(raw_url)
+    campaign_running = True
+    stop_campaign_flag = False
+    th = threading.Thread(target=drip_campaign_worker, args=(chat_id, c_url), daemon=True)
     th.start()
-
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    btn_skip = types.InlineKeyboardButton("⚡ Skip (Abhi Lagao)", callback_data=f"skip|{clean_url}")
-    btn_cancel = types.InlineKeyboardButton("❌ Cancel Order", callback_data=f"cancel|{clean_url}")
-    markup.add(btn_skip, btn_cancel)
-
-    msg_txt = (
-        f"🎯 <b>Instagram Reel Link Received!</b>\n"
-        f"<code>{clean_url}</code>\n\n"
-        f"⏳ <b>{delay_mins}-Minute Delay Timer Shuru!</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🕒 <b>Order Execution Time:</b> <b>{target_ist} IST</b> (Theek {delay_mins} min baad)\n"
-        f"🌊 <b>Drip Plan:</b> {actual_total} Views ({r_runs} runs x {i_interval}m interval)\n"
-        f"📦 <b>Per Run:</b> <b>{qty_per_run} views/run</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"😴 <i>Aap aaram karein! Theek {delay_mins} minute baad bot khud YoyoMedia par order lagayega aur phone par alert bhejega! 🔔</i>"
-    )
-    send_safe_msg(chat_id, msg_txt, reply_markup=markup)
-
-# =====================================================================
-# ⚙️ SETTINGS MENU
-# =====================================================================
-def get_settings_markup():
-    markup = types.InlineKeyboardMarkup(row_width=3)
-    btn_d15 = types.InlineKeyboardButton("⏱️ Delay: 15m", callback_data="cfg_delay_15")
-    btn_d16 = types.InlineKeyboardButton("⏱️ Delay: 16m", callback_data="cfg_delay_16")
-    btn_d18 = types.InlineKeyboardButton("⏱️ Delay: 18m", callback_data="cfg_delay_18")
-
-    btn_i16 = types.InlineKeyboardButton("🔄 Gap: 16m", callback_data="cfg_interval_16")
-    btn_i30 = types.InlineKeyboardButton("🔄 Gap: 30m", callback_data="cfg_interval_30")
-    btn_i45 = types.InlineKeyboardButton("🔄 Gap: 45m", callback_data="cfg_interval_45")
-    
-    btn_r8 = types.InlineKeyboardButton("🔁 8 Runs (1k Views)", callback_data="cfg_runs_8")
-    btn_r12 = types.InlineKeyboardButton("🔁 12 Runs (1.5k)", callback_data="cfg_runs_12")
-    btn_r16 = types.InlineKeyboardButton("🔁 16 Runs (2k)", callback_data="cfg_runs_16")
-
-    markup.row(btn_d15, btn_d16, btn_d18)
-    markup.row(btn_i16, btn_i30, btn_i45)
-    markup.row(btn_r8, btn_r12, btn_r16)
-    return markup
-
-def format_settings_text():
-    qty = drip_config.get("qty_per_run", 125)
-    r = drip_config["runs"]
-    i = drip_config["interval"]
-    d = drip_config.get("initial_delay", 16)
-    actual_total = qty * r
-    hours = (r * i) / 60
-    return (
-        f"⚙️ <b>Drip-Feed Live Settings:</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⏳ <b>Initial Delay:</b> <code>{d} minutes</code> (Link aane ke {d} min baad)\n"
-        f"📦 <b>Views per run:</b> <code>{qty} views</code>\n"
-        f"🔁 <b>Number of Runs:</b> <code>{r} runs</code>\n"
-        f"⏱️ <b>Interval (Runs Gap):</b> <code>{i} minutes</code>\n"
-        f"👁️ <b>Total Views:</b> <code>{actual_total} Views</code>\n"
-        f"⌛ <b>Total Campaign Duration:</b> <code>~{hours:.1f} Hours</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"<i>Neeche buttons par tap karke kisi bhi waqt badal sakte hain:</i>"
-    )
 
 # =====================================================================
 # 💬 TELEGRAM COMMANDS
@@ -285,54 +224,62 @@ def cmd_start(message):
     if not check_authorized(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
-    d = drip_config.get("initial_delay", 16)
-    r = drip_config.get("runs", 8)
-    i = drip_config.get("interval", 16)
-    q = drip_config.get("qty_per_run", 125)
-    tot = q * r
     txt = (
-        f"🌊 <b>Instagram Drip-Feed Automation Bot</b>\n"
+        f"🎵 <b>TikTok 16-Step Drip-Feed Bot</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡ <b>Ye Bot Kaise Kaam Karta Hai?</b>\n"
-        f"1. Instagram par reel post karein.\n"
-        f"2. <b>Seedha Reel ka link yahan bhej dein!</b>\n"
-        f"3. Bot theek <b>{d} minute ka timer</b> chalayega aur {d} min baad <b>YoyoMedia par Drip-Feed Order (#3508)</b> khud laga dega!\n\n"
-        f"⚙️ <b>Active Setup:</b>\n"
-        f"• Per Run Views: <b>{q} Views</b>\n"
-        f"• Number of Runs: <b>{r} Runs</b>\n"
-        f"• Interval: Har <b>{i} Minute</b> me\n"
-        f"• Total Views: <b>{tot} Views</b>\n\n"
+        f"⚙️ <b>Fixed Configuration:</b>\n"
+        f"• Panel: <code>xmediasmm.in</code> (Service 1364)\n"
+        f"• Quantity per Run: <b>125 Views</b>\n"
+        f"• Number of Runs: <b>16 Runs</b>\n"
+        f"• Interval: Har <b>45 Minute</b> me\n"
+        f"• Total Target: <b>2,000 Views</b>\n"
+        f"• Start: <b>Link paste karte hi Run 1 shuru!</b>\n\n"
         f"📌 <b>Commands:</b>\n"
-        f"• <code>/settings</code> - Runs, Delay & Interval change karein\n"
-        f"• <code>/balance</code> - YoyoMedia wallet balance\n"
-        f"• <code>/stop</code> - Active timer cancel karein\n"
+        f"• <code>/status</code> - Active campaign progress & next run time\n"
+        f"• <code>/balance</code> - Check xmediasmm.in wallet balance\n"
+        f"• <code>/stop</code> - Stop current campaign\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 <i>Bas Instagram Reel ka link paste karo, baaki kaam bot karega!</i>"
+        f"💡 <i>Bas TikTok ka link paste karo, Run 1 turant start ho jayega!</i>"
     )
     send_safe_msg(message.chat.id, txt)
-
-@bot.message_handler(commands=['settings', 'config'])
-def cmd_settings(message):
-    if not check_authorized(message):
-        return
-    send_safe_msg(message.chat.id, format_settings_text(), reply_markup=get_settings_markup())
 
 @bot.message_handler(commands=['balance'])
 def cmd_balance(message):
     if not check_authorized(message):
         return
     bal = fetch_balance()
-    send_safe_msg(message.chat.id, f"💰 <b>YoyoMedia Wallet Balance:</b> <code>{bal}</code>")
+    send_safe_msg(message.chat.id, f"💰 <b>xmediasmm.in Wallet Balance:</b> <code>{bal}</code>")
+
+@bot.message_handler(commands=['status'])
+def cmd_status(message):
+    if not check_authorized(message):
+        return
+    if not campaign_running:
+        send_safe_msg(message.chat.id, "ℹ️ Abhi koi campaign nahi chal raha hai.")
+        return
+    info = current_campaign_info
+    pct = int((info.get('views_sent', 0) / TOTAL_VIEWS) * 100)
+    txt = (
+        f"📊 <b>Active Campaign Status:</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔗 <b>Link:</b> <code>{info.get('link', 'N/A')}</code>\n"
+        f"📍 <b>Current Run:</b> {info.get('current_run', 0)} / {TOTAL_RUNS}\n"
+        f"👁️ <b>Views Sent:</b> <code>{info.get('views_sent', 0)} / {TOTAL_VIEWS}</code> ({pct}%)\n"
+        f"🕒 <b>Next Run:</b> {info.get('next_run_ist', 'In Progress')} IST\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━"
+    )
+    send_safe_msg(message.chat.id, txt)
 
 @bot.message_handler(commands=['stop', 'cancel'])
 def cmd_stop(message):
+    global stop_campaign_flag
     if not check_authorized(message):
         return
-    if message.chat.id in active_timers:
-        active_timers[message.chat.id]["cancel"] = True
-        send_safe_msg(message.chat.id, "🛑 Active timer cancel kar diya gaya hai.")
-    else:
-        send_safe_msg(message.chat.id, "ℹ️ Koi active timer nahi chal raha hai.")
+    if not campaign_running:
+        send_safe_msg(message.chat.id, "ℹ️ Koi campaign nahi chal raha hai.")
+        return
+    stop_campaign_flag = True
+    send_safe_msg(message.chat.id, "⏳ Campaign stop kiya ja raha hai...")
 
 @bot.message_handler(commands=['auth'])
 def cmd_auth(message):
@@ -347,59 +294,17 @@ def cmd_auth(message):
         send_safe_msg(message.chat.id, "⚠️ Usage: <code>/auth &lt;user_id&gt;</code>")
 
 # =====================================================================
-# 🔗 DIRECT INSTAGRAM LINK HANDLER (100% AUTOMATIC)
+# 🔗 DIRECT LINK HANDLER (Paste link -> Starts immediately)
 # =====================================================================
 @bot.message_handler(func=lambda msg: True)
 def handle_all_messages(message):
     if not check_authorized(message):
         return
     text = message.text.strip()
-    if "instagram.com" in text:
-        start_drip_pipeline(message.chat.id, text)
+    if "tiktok.com" in text or "http://" in text or "https://" in text:
+        start_campaign(message.chat.id, text)
     else:
-        send_safe_msg(message.chat.id, "❓ Unknown message. Kripya Instagram Reel ka link paste karein ya /help type karein.")
-
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callbacks(call):
-    chat_id = call.message.chat.id
-    data = call.data
-
-    bot.answer_callback_query(call.id)
-
-    if data.startswith("cfg_"):
-        parts = data.split("_")
-        key = parts[1]
-        val = int(parts[2])
-        if key == "interval":
-            drip_config["interval"] = val
-        elif key == "runs":
-            drip_config["runs"] = val
-        elif key == "delay":
-            drip_config["initial_delay"] = val
-        save_drip_config(drip_config)
-
-        try:
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=call.message.message_id,
-                text=f"✅ <b>Setting Updated!</b>\n\n{format_settings_text()}",
-                parse_mode="HTML",
-                reply_markup=get_settings_markup()
-            )
-        except Exception:
-            send_safe_msg(chat_id, f"✅ <b>Setting Updated!</b>\n\n{format_settings_text()}", reply_markup=get_settings_markup())
-        return
-
-    if data.startswith("skip|"):
-        link = data.split("|", maxsplit=1)[1]
-        if chat_id in active_timers:
-            active_timers[chat_id]["skip"] = True
-        else:
-            execute_order_now(chat_id, link)
-    elif data.startswith("cancel|"):
-        if chat_id in active_timers:
-            active_timers[chat_id]["cancel"] = True
-            send_safe_msg(chat_id, "🛑 Order cancelled.")
+        send_safe_msg(message.chat.id, "❓ Unknown message. Kripya video/TikTok link paste karein ya /help type karein.")
 
 # =====================================================================
 # 🌐 KEEP-ALIVE DUMMY HTTP SERVER (For Render Free Web Service)
@@ -409,7 +314,7 @@ class DummyServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"Drip-Feed Bot is Active and Healthy!")
+        self.wfile.write(b"TikTok Drip Bot is Active and Healthy!")
     def log_message(self, format, *args):
         pass
 
@@ -427,7 +332,7 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🌊 Pure Instagram Drip-Feed Bot Started (125 Views / 16 Min Interval)...")
+    print("🎵 TikTok 16-Step Drip-Feed Bot Started (xmediasmm.in)...")
     while True:
         try:
             bot.infinity_polling(timeout=20, long_polling_timeout=20)
