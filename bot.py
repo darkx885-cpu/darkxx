@@ -17,7 +17,7 @@ if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
 # =====================================================================
 # 🤖 NEW TELEGRAM BOT CONFIGURATION
 # =====================================================================
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8631983010:AAHQywuXnx7MiofvF5O8YOsY07L8U8E9Bw0")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8959503657:AAFutbdLkq8YW9y6d5C3gqcdmNk0UzDd2yI")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
