@@ -15,9 +15,9 @@ if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 # =====================================================================
-# 🤖 NEW TELEGRAM BOT CONFIGURATION
+# 🤖 BOT CONFIGURATION (@Darkzzzo_bot - FRESH TOKEN)
 # =====================================================================
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8959503657:AAFutbdLkq8YW9y6d5C3gqcdmNk0UzDd2yI")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8959503657:AAHLEyw0zY99dwmAQqTEOHfgFXo-tdhN1yo")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
@@ -286,7 +286,7 @@ def cmd_start(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
     txt = (
-        f"🤖 <b>Instagram 5-Hour Curve Bot</b>\n"
+        f"🤖 <b>Instagram 5-Hour Curve Bot (@Darkzzzo_bot)</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🎯 <b>Target:</b> 2,000 Views (#3508) + 42 Likes (#4731)\n"
         f"⏳ <b>Milestones:</b>\n"
@@ -376,7 +376,7 @@ class DummyServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"Instagram 5-Hour Bot is Online!")
+        self.wfile.write(b"Darkx Instagram 5-Hour Bot is Online!")
     def log_message(self, format, *args):
         pass
 
@@ -394,7 +394,7 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🤖 Instagram 5-Hour Curve Bot Started...")
+    print("🤖 Darkx Instagram 5-Hour Bot Started...")
     while True:
         try:
             bot.infinity_polling(timeout=25, long_polling_timeout=25)
