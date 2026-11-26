@@ -30,7 +30,7 @@ PANEL_URL = "https://yoyomedia.in/api/v2"
 API_KEY = "47c00685f39f03a4c800b0ceae48537099e598a0a7b08789ca6a365338c3432f"
 
 # Verified Services from YoYoMedia Screenshots:
-SERVICE_INSTA_VIEWS = 14218  # Instagram Video/Reel Views [100M] [Fast]
+SERVICE_INSTA_VIEWS = 11271  # Instagram Video/Reel Views [100M] [Fast]
 SERVICE_INSTA_LIKES = 4482   # Instagram Likes [100k] [10K P/H] - ₹ 11.41
 
 HEADERS = {
