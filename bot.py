@@ -26,7 +26,7 @@ ALLOWED_USERS = [8207879798]
 # 🌐 YOYOMEDIA.COM PANEL
 # =====================================================================
 PANEL_URL = "https://yoyomedia.com/api/v2"
-API_KEY = "ded26a46780e31440b87c68f529200ca911ca6906dd2822131284c9cbf23d72a"
+API_KEY = "1504b2badaa2238f4dc062d7b36264d2d53687386a63e9ef706befa91878d3d6"
 
 SERVICE_INSTA_VIEWS = 4322   # Instagram Video/Reel Views [100M] [Fast]
 SERVICE_INSTA_LIKES = 4731   # Instagram Likes [100k] [10K P/H]
