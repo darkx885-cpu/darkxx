@@ -15,7 +15,7 @@ if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 # =====================================================================
-# 🤖 BOT CONFIGURATION (@Darkzzzo_bot - FRESH TOKEN)
+# 🤖 BOT CONFIGURATION (@Darkzzzo_bot)
 # =====================================================================
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8901542723:AAFd54ZpaMc9DyOdqEKp6KFsEXlFMzgygYU")
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -24,14 +24,14 @@ ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 ALLOWED_USERS = [8207879798]
 
 # =====================================================================
-# 🌐 YOYOMEDIA SMM PANEL CONFIGURATION
+# 🌐 YOYOMEDIA.IN PANEL CONFIGURATION (NEW API KEY & SERVICES)
 # =====================================================================
-PANEL_URL = "https://yoyomedia.com/api/v2"
-API_KEY = "302b656afc8f7d24943882aa1196abff174e0331132f86ada23b07c303c07a06"
+PANEL_URL = "https://yoyomedia.in/api/v2"
+API_KEY = "47c00685f39f03a4c800b0ceae48537099e598a0a7b08789ca6a365338c3432f"
 
-# Verified Services from YoYoMedia:
-SERVICE_INSTA_VIEWS = 3508   # Instagram Reel/Video Views [Best Views] [Non Drop] (Min: 100)
-SERVICE_INSTA_LIKES = 4731   # InstaGram Likes [WW] [New Service] (Min: 10)
+# Verified Services from YoYoMedia Screenshots:
+SERVICE_INSTA_VIEWS = 14218  # Instagram Video/Reel Views [100M] [Fast]
+SERVICE_INSTA_LIKES = 4482   # Instagram Likes [100k] [10K P/H] - ₹ 11.41
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -39,32 +39,22 @@ HEADERS = {
 }
 
 # =====================================================================
-# 🌊 EXACT 5-HOUR S-CURVE SCHEDULE (0 at start, 100 at 1 hr mark)
+# 🌊 EXACT 8-BATCH SCHEDULE (2,101 Views + 42 Likes | 5 Hr 15 Min)
 # =====================================================================
-# Milestones: 1Hr=100 | 2Hr=250 | 3Hr=700 | 4Hr=1400 | 5Hr=2000
 # Format: (TargetMinutesFromStart, ViewsQty, LikesQty, PhaseLabel)
-SCHEDULE_5HR = [
-    # 1 Hour Complete hone par 100 views (Minute 55 par dispatch)
-    (55,   100,  0,  "Hour 1 Mark: Initial Hook (+100 Views -> 100 Total)"),
-
-    # 2 Hours Complete hone par 250 views (+150 views + Wave 1 Likes)
-    (115,  150, 14,  "Hour 2 Mark: Pickup (+150 Views -> 250 Total) + ❤️ Wave 1 (+14 Likes)"),
-
-    # 3 Hours Complete hone par 700 views (+225 and +225)
-    (150,  225,  0,  "Hour 3: Acceleration (+225 Views -> 475 Total)"),
-    (175,  225,  0,  "Hour 3 Mark: (+225 Views -> 700 Total Views)"),
-
-    # 4 Hours Complete hone par 1,400 views (+350 and +350 + Wave 2 Likes)
-    (210,  350, 14,  "Hour 4: 🔥 Peak Blast (+350 Views -> 1,050 Total) + ❤️ Wave 2 (+14 Likes)"),
-    (235,  350,  0,  "Hour 4 Mark: Peak Sustained (+350 Views -> 1,400 Total Views)"),
-
-    # 5 Hours Complete hone par 2,000 views (+300 and +300 + Wave 3 Likes)
-    (270,  300,  0,  "Hour 5: Final Push (+300 Views -> 1,700 Total)"),
-    (295,  300, 14,  "Hour 5 Mark: 🏁 Final Lock (+300 Views -> 2,000 Total Views) + ❤️ Wave 3 (+14 Likes)"),
+SCHEDULE_8_BATCHES = [
+    (0,    293,  0,  "Batch #1: Initial Hook (+293 Views)"),
+    (15,   254,  0,  "Batch #2: Follow-up Surge (+254 Views)"),
+    (135,  365, 15,  "Batch #3: Mid Surge (+365 Views) + ❤️ Wave 1 (+15 Likes)"),
+    (210,  257,  0,  "Batch #4: Exploration Push (+257 Views)"),
+    (240,  209, 11,  "Batch #5: Steady Momentum (+209 Views) + ❤️ Wave 2 (+11 Likes)"),
+    (270,  357,  0,  "Batch #6: Viral Climb (+357 Views)"),
+    (300,  207, 16,  "Batch #7: Final Surge (+207 Views) + ❤️ Wave 3 (+16 Likes)"),
+    (315,  159,  0,  "Batch #8: 🏁 Soft Landing (+159 Views - 2,101 Total Done!)"),
 ]
 
-TARGET_VIEWS = sum(item[1] for item in SCHEDULE_5HR)   # Exact 2,000 Views
-TARGET_LIKES = sum(item[2] for item in SCHEDULE_5HR)   # Exact 42 Likes
+TARGET_VIEWS = sum(item[1] for item in SCHEDULE_8_BATCHES)   # Exact 2,101 Views
+TARGET_LIKES = sum(item[2] for item in SCHEDULE_8_BATCHES)   # Exact 42 Likes
 
 # Active task tracking
 active_tasks = {}
@@ -108,7 +98,7 @@ def clean_instagram_url(text):
     return None
 
 # =====================================================================
-# 📡 YOYOMEDIA API DISPATCHER
+# 📡 YOYOMEDIA.IN API DISPATCHER
 # =====================================================================
 def fetch_balance():
     try:
@@ -157,9 +147,9 @@ def place_order_with_smart_retry(service_id, link, quantity, chat_id=None, step_
     return False, res
 
 # =====================================================================
-# 🌊 5-HOUR WORKER (0 at Start -> 100 at 1 hr mark)
+# 🌊 8-BATCH ORGANIC WORKER (2,101 Views + 42 Likes)
 # =====================================================================
-def insta_5hr_worker(chat_id, link):
+def insta_organic_worker(chat_id, link):
     active_tasks[chat_id] = {
         "cancel": False,
         "skip": False,
@@ -172,7 +162,7 @@ def insta_5hr_worker(chat_id, link):
     start_time = time.time()
     total_views = 0
     total_likes = 0
-    total_steps = len(SCHEDULE_5HR)
+    total_steps = len(SCHEDULE_8_BATCHES)
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     btn_skip = types.InlineKeyboardButton("⚡ Skip Wait", callback_data="cmd_skip")
@@ -181,17 +171,19 @@ def insta_5hr_worker(chat_id, link):
 
     send_safe_msg(
         chat_id,
-        f"🚀 <b>INSTAGRAM 5-HOUR CAMPAIGN STARTED!</b>\n"
+        f"🚀 <b>INSTAGRAM 8-BATCH CAMPAIGN STARTED!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🔗 <b>Reel:</b> <code>{link}</code>\n"
-        f"🎯 <b>Target:</b> 2,000 Views (#3508) + 42 Likes (#4731)\n"
-        f"⏳ <b>Milestones:</b> 1Hr=100 | 2Hr=250 | 3Hr=700 | 4Hr=1400 | 5Hr=2000\n"
-        f"⏱️ <b>Notice:</b> <i>Pehla batch 55 min baad (1 hour complete hone par) place hoga!</i>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━",
+        f"🎯 <b>Target Views:</b> {TARGET_VIEWS} Views (#14218)\n"
+        f"❤️ <b>Target Likes:</b> {TARGET_LIKES} Likes (#4482 - 3 Waves)\n"
+        f"⏱️ <b>Duration:</b> 5 Hr 15 Min (8 Precision Batches)\n"
+        f"🌐 <b>Panel:</b> YoYoMedia.in\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Batch #1 (+293 views) abhi turant place ho raha hai...</i>",
         reply_markup=markup
     )
 
-    for idx, (target_min, v_qty, l_qty, phase_name) in enumerate(SCHEDULE_5HR):
+    for idx, (target_min, v_qty, l_qty, phase_name) in enumerate(SCHEDULE_8_BATCHES):
         step_num = idx + 1
         target_sec = target_min * 60
 
@@ -245,21 +237,21 @@ def insta_5hr_worker(chat_id, link):
         msg_details = "\n".join([x for x in [views_placed_str, likes_placed_str] if x])
         send_safe_msg(
             chat_id,
-            f"✅ <b>Milestone #{step_num}/{total_steps} Delivered!</b>\n"
+            f"✅ <b>Batch #{step_num}/{total_steps} Placed!</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📊 <b>Phase:</b> <i>{phase_name}</i>\n"
             f"{msg_details}\n"
-            f"📈 <b>Live Total:</b> <code>{total_views}/{TARGET_VIEWS} Views</code> | <code>{total_likes}/{TARGET_LIKES} Likes</code>\n"
+            f"📈 <b>Live Progress:</b> <code>{total_views}/{TARGET_VIEWS} Views</code> | <code>{total_likes}/{TARGET_LIKES} Likes</code>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━",
             reply_markup=markup
         )
 
     send_safe_msg(
         chat_id,
-        f"🎉🎉 <b>INSTAGRAM 5-HOUR CAMPAIGN COMPLETED!</b> 🎉🎉\n"
+        f"🎉🎉 <b>INSTAGRAM 8-BATCH CAMPAIGN COMPLETED!</b> 🎉🎉\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🔗 <code>{link}</code>\n"
-        f"👁️ <b>Total Views:</b> {total_views} Views (Exact 2,000)\n"
+        f"👁️ <b>Total Views:</b> {total_views} Views (Exact 2,101)\n"
         f"❤️ <b>Total Likes:</b> {total_likes} Likes (Exact 42)\n"
         f"🏁 <b>Status:</b> 100% Whop & Fraud-Check Safe! 🚀"
     )
@@ -274,7 +266,7 @@ def start_pipeline(chat_id, clean_url):
         active_tasks[chat_id]["cancel"] = True
         time.sleep(1)
 
-    th = threading.Thread(target=insta_5hr_worker, args=(chat_id, clean_url), daemon=True)
+    th = threading.Thread(target=insta_organic_worker, args=(chat_id, clean_url), daemon=True)
     th.start()
 
 # =====================================================================
@@ -286,21 +278,18 @@ def cmd_start(message):
         send_safe_msg(message.chat.id, "⛔ Access Denied.")
         return
     txt = (
-        f"🤖 <b>Instagram 5-Hour Curve Bot (@Darkzzzo_bot)</b>\n"
+        f"🤖 <b>Instagram 8-Batch Preset Bot (@Darkzzzo_bot)</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎯 <b>Target:</b> 2,000 Views (#3508) + 42 Likes (#4731)\n"
-        f"⏳ <b>Milestones:</b>\n"
-        f"• 1 Hour baad: 100 Views\n"
-        f"• 2 Hours baad: 250 Views (+14 Likes)\n"
-        f"• 3 Hours baad: 700 Views\n"
-        f"• 4 Hours baad: 1,400 Views (+14 Likes)\n"
-        f"• 5 Hours baad: 2,000 Views (+14 Likes)\n\n"
+        f"🎯 <b>Target:</b> 2,101 Views (#14218) + 42 Likes (#4482)\n"
+        f"⏳ <b>Cadence:</b> 8 Batches (5 Hr 15 Min Total)\n"
+        f"❤️ <b>Likes Waves:</b> +15 (2.25 Hr) | +11 (4.0 Hr) | +16 (5.0 Hr)\n"
+        f"🌐 <b>Panel:</b> YoYoMedia.in\n\n"
         f"📌 <b>Commands:</b>\n"
         f"• <code>/status</code> - Check live campaign progress\n"
-        f"• <code>/balance</code> - Check YoYoMedia balance\n"
+        f"• <code>/balance</code> - Check YoYoMedia.in wallet balance\n"
         f"• <code>/stop</code> - Cancel active campaign\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 <i>Reel ka link bhejo, bot 1st hour pura hone par pehla 100 views batch bhejega!</i>"
+        f"💡 <i>Bas Instagram Reel ka link paste karo, Batch #1 (+293 views) turant start ho jayega!</i>"
     )
     send_safe_msg(message.chat.id, txt)
 
@@ -314,7 +303,7 @@ def cmd_status(message):
             f"📊 <b>LIVE INSTAGRAM STATUS</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"🔗 <b>Target:</b> <code>{info['link']}</code>\n"
-            f"📍 <b>Step:</b> #{info['step']}/{len(SCHEDULE_5HR)}\n"
+            f"📍 <b>Batch:</b> #{info['step']}/{len(SCHEDULE_8_BATCHES)}\n"
             f"👁️ <b>Views Placed:</b> {info['views_placed']}/{TARGET_VIEWS}\n"
             f"❤️ <b>Likes Placed:</b> {info['likes_placed']}/{TARGET_LIKES}\n"
             f"⏰ <b>Started At:</b> {info['start_time']}\n"
@@ -329,7 +318,7 @@ def cmd_balance(message):
     if not check_authorized(message):
         return
     bal = fetch_balance()
-    send_safe_msg(message.chat.id, f"💰 <b>YoYoMedia Live Balance:</b> <code>{bal}</code>")
+    send_safe_msg(message.chat.id, f"💰 <b>YoYoMedia.in Live Balance:</b> <code>{bal}</code>")
 
 @bot.message_handler(commands=['stop', 'cancel'])
 def cmd_stop(message):
@@ -376,7 +365,7 @@ class DummyServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"Darkx Instagram 5-Hour Bot is Online!")
+        self.wfile.write(b"Instagram 8-Batch Bot is Online!")
     def log_message(self, format, *args):
         pass
 
@@ -394,7 +383,7 @@ def run_dummy_server():
 if __name__ == "__main__":
     t = threading.Thread(target=run_dummy_server, daemon=True)
     t.start()
-    print("🤖 Darkx Instagram 5-Hour Bot Started...")
+    print("🤖 Darkx 8-Batch Bot (YoYoMedia.in) Started...")
     while True:
         try:
             bot.infinity_polling(timeout=25, long_polling_timeout=25)
