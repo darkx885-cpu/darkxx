@@ -26,12 +26,12 @@ ALLOWED_USERS = [8207879798]
 # =====================================================================
 # 🌐 YOYOMEDIA.IN PANEL CONFIGURATION (NEW API KEY & SERVICES)
 # =====================================================================
-PANEL_URL = "https://yoyomedia.in/api/v2"
-API_KEY = "47c00685f39f03a4c800b0ceae48537099e598a0a7b08789ca6a365338c3432f"
+PANEL_URL = "https://yoyomedia.com/api/v2"
+API_KEY = "b54431160b857638c4ee5b5ce758070dc364fccf144b724bc1bbfb9e22eb4526"
 
 # Verified Services from YoYoMedia Screenshots:
-SERVICE_INSTA_VIEWS = 11271  # Instagram Video/Reel Views [100M] [Fast]
-SERVICE_INSTA_LIKES = 4482   # Instagram Likes [100k] [10K P/H] - ₹ 11.41
+SERVICE_INSTA_VIEWS = 4322  # Instagram Video/Reel Views [100M] [Fast]
+SERVICE_INSTA_LIKES = 4731   # Instagram Likes [100k] [10K P/H] - ₹ 11.41
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
